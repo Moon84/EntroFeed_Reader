@@ -1,7 +1,3 @@
-.PHONY: tw
-tw:
-	npx tailwindcss -i ./templates/input.css -o ./src/static/output.css --watch --minify
-
 .PHONY: install
 install:
 	cd frontend && npm install
@@ -14,11 +10,11 @@ install-ci:
 
 .PHONY: run
 run:
-	uvicorn src:run --reload --log-level debug --port 8001
+	uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: run-ci
 run-ci:
-	uvicorn src:run &
+	uvicorn src.app:app &
 
 .PHONY: dev-frontend
 dev-frontend:
@@ -26,7 +22,7 @@ dev-frontend:
 
 .PHONY: dev-backend
 dev-backend:
-	uvicorn src:run --reload --log-level debug --port 8001
+	uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: dev
 dev:

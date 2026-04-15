@@ -37,5 +37,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dark/Light theme support
 - Article translation feature
 
-[Unreleased]: https://github.com/entrofeed/entrofeed/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/entrofeed/entrofeed/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Moon84/EntroFeed_Reader/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Moon84/EntroFeed_Reader/releases/tag/v0.1.0

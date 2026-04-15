@@ -4,7 +4,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/entrofeed/entrofeed.git
+git clone https://github.com/Moon84/EntroFeed_Reader.git
 cd entrofeed
 
 # 2. 配置环境变量

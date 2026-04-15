@@ -48,7 +48,7 @@ Visit `http://localhost:5173` to access the application.
 ### Using Docker Compose
 
 ```bash
-git clone https://github.com/entrofeed/entrofeed.git
+git clone https://github.com/Moon84/EntroFeed_Reader.git
 cd entrofeed
 docker compose up
 ```
@@ -181,4 +181,4 @@ AGPL 3.0 License
 - Location: Shanghai, Hongkou District
 - Documentation: [docs/](docs/)
 - Docker Deployment Guide: [docs/docker.zh.md](docs/docker.zh.md)
-- Issue Tracker: [GitHub Issues](https://github.com/entrofeed/entrofeed/issues)
+- Issue Tracker: [GitHub Issues](https://github.com/Moon84/EntroFeed_Reader/issues)

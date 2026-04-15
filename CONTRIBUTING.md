@@ -15,7 +15,7 @@ Thank you for your interest in contributing to EntroFeed!
 
 ```bash
 # Clone the repository
-git clone https://github.com/entrofeed/entrofeed.git
+git clone https://github.com/Moon84/EntroFeed_Reader.git
 cd entrofeed
 
 # Install dependencies (frontend + backend)
@@ -180,7 +180,7 @@ docker run -p 8000:80 entrofeed
 
 ## Questions?
 
-- Open an issue at https://github.com/entrofeed/entrofeed/issues
+- Open an issue at https://github.com/Moon84/EntroFeed_Reader/issues
 - Check the [documentation](docs/) for detailed guides
 
 ## License

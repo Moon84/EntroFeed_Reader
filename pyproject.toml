@@ -70,11 +70,11 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/entrofeed/entrofeed"
-"Bug Reports" = "https://github.com/entrofeed/entrofeed/issues"
+"Homepage" = "https://github.com/Moon84/EntroFeed_Reader"
+"Bug Reports" = "https://github.com/Moon84/EntroFeed_Reader/issues"
 "Funding" = "https://donate.pypi.org"
 "Say Thanks!" = "http://saythanks.io/to/example"
-"Source" = "https://github.com/entrofeed/entrofeed/"
+"Source" = "https://github.com/Moon84/EntroFeed_Reader/"
 
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.

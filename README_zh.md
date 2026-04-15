@@ -32,7 +32,7 @@ EntroFeed 支持模块化处理器：
 ### Docker Compose 部署
 
 ```bash
-git clone https://github.com/entrofeed/entrofeed.git
+git clone https://github.com/Moon84/EntroFeed_Reader.git
 cd entrofeed
 docker compose up
 ```
@@ -135,4 +135,4 @@ AGPL3.0 许可证
 - InTheCity: 上海，虹口
 - [文档](docs/)
 - [Docker 部署指南](docs/docker.md)
-- [问题反馈](https://github.com/entrofeed/entrofeed/issues)
+- [问题反馈](https://github.com/Moon84/EntroFeed_Reader/issues)
