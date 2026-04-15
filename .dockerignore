@@ -1,0 +1,59 @@
+# Python
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/*.egg-info
+**/dist
+**/build
+.eggs
+
+# Node
+**/node_modules
+**/.npm
+**/.yarn
+
+# Git
+**/.git
+**/.gitignore
+**/.gitattributes
+
+# IDE / Editor
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/.DS_Store
+
+# Environment & Secrets
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Tests
+**/tests
+**/test
+**/*_test.py
+**/test_*.py
+**/*.test.ts
+**/*.spec.ts
+**/coverage
+**/.tox
+
+# Documentation
+**/*.md
+**/docs
+
+# Docker
+**/Dockerfile
+**/docker-compose*.yml
+
+# Misc
+**/.cache
+**/.tmp
+**/.temp
+**/*.log
+**/*.tmp

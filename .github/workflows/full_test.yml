@@ -1,0 +1,49 @@
+name: Full Test
+on:
+  workflow_call:
+      inputs:
+        storage_handler:
+          required: true
+          type: string
+        content_retrieval_handler:
+          required: true
+          type: string
+        llm_handler:
+          required: true
+          type: string
+
+env:
+  IMAGE_NAME: entrofeed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ENTROFEED_STORAGE_HANDLER: ${{ inputs.storage_handler }}
+      CONFIG_DIR: ${{ github.workspace }}/tests/integration/config
+      DATA_DIR: ${{ github.workspace }}/data
+      RSS_BASE_URL: http://localhost:8000
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: install
+        run: |
+          pip install uv && uv venv
+          source .venv/bin/activate
+          make install-ci
+      - name: unit_test
+        run: |
+          source .venv/bin/activate
+          make unit-test
+          make clean
+      - name: integration_test
+        run: |
+          source .venv/bin/activate
+          mv tests/integration/config/settings-${{ inputs.content_retrieval_handler }}-${{ inputs.llm_handler}}.yml tests/integration/config/settings.yml
+          entrofeed load-settings
+          entrofeed load-feeds
+          entrofeed check-feeds
+          make run-ci
+          make integration-test

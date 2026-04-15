@@ -1,0 +1,128 @@
+- name: arXiv cs.AI (人工智能)
+  category: Tier1-ArXiv
+  url: https://arxiv.org/rss/cs.AI
+
+- name: arXiv cs.LG (机器学习)
+  category: Tier1-ArXiv
+  url: https://arxiv.org/rss/cs.LG
+
+- name: arXiv cs.CV (计算机视觉)
+  category: Tier1-ArXiv
+  url: https://arxiv.org/rss/cs.CV
+
+- name: arXiv q-bio (定量生物学)
+  category: Tier1-ArXiv
+  url: https://arxiv.org/rss/q-bio
+
+- name: Nature Medicine
+  category: Tier1-Journals
+  url: https://www.nature.com/nm/articles?rss=1
+
+- name: Nature Biotechnology
+  category: Tier1-Journals
+  url: https://www.nature.com/nbt/rss.xml
+
+- name: Nature Biomedical Engineering
+  category: Tier1-Journals
+  url: https://www.nature.com/natbiomedeng/rss.xml
+
+- name: Science Translational Medicine
+  category: Tier1-Journals
+  url: https://www.science.org/action/showFeed?type=etoc&feedId=transmed_rss.xml
+
+- name: medRxiv General (综合医学)
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=general
+
+- name: medRxiv Oncology (肿瘤学)
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=oncology
+
+- name: medRxiv Neurology (神经学)
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=neurology
+
+- name: medRxiv Cardiovascular Medicine
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=cardiovascular_medicine
+
+- name: medRxiv Genetic & Genomic Medicine
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=genetic_and_genomic_medicine
+
+- name: medRxiv Public & Global Health
+  category: medRxiv
+  url: https://connect.medrxiv.org/medrxiv_xml.php?subject=public_and_global_health
+
+- name: FDA Press Releases
+  category: Regulatory
+  url: https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml
+
+- name: EMA News
+  category: Regulatory
+  url: https://www.ema.europa.eu/en/news.xml
+
+- name: NIH
+  category: Regulatory
+  url: https://www.nih.gov/rss
+
+- name: Google Health
+  category: Industry-AI-Tech
+  url: https://blog.google/technology/health/rss/
+
+- name: Healthcare IT News
+  category: Industry-AI-Tech
+  url: https://www.healthcareitnews.com/rss
+
+- name: MedTech Dive
+  category: Industry-AI-Tech
+  url: https://www.medtechdive.com/feeds/news/
+
+- name: MobiHealthNews
+  category: Industry-AI-Tech
+  url: https://www.mobihealthnews.com/rss
+
+- name: STAT News
+  category: Industry-Biotech
+  url: https://www.statnews.com/feed/
+
+- name: STAT News - Biotech
+  category: Industry-Biotech
+  url: https://www.statnews.com/category/biotech/feed/
+
+- name: Endpoints News
+  category: Industry-Biotech
+  url: https://endpoints.news/feed/
+
+- name: FierceBiotech
+  category: Industry-Biotech
+  url: https://www.fiercebiotech.com/rss.xml
+
+- name: FiercePharma
+  category: Industry-Biotech
+  url: https://www.fiercepharma.com/rss.xml
+
+- name: GEN (Genetic Engineering & Biotechnology News)
+  category: Industry-Biotech
+  url: https://www.genengnews.com/feed/
+
+- name: Clinical Trials Arena
+  category: Industry-Biotech
+  url: https://www.clinicaltrialsarena.com/rss
+
+- name: TechCrunch - Healthcare
+  category: Industry-VC-Startup
+  url: https://techcrunch.com/tag/healthcare/feed/
+
+- name: TechCrunch - Biotech
+  category: Industry-VC-Startup
+  url: https://techcrunch.com/tag/biotech/feed/
+
+- name: MedCity News
+  category: Industry-VC-Startup
+  url: https://medcitynews.com/feed/
+
+- name: FierceHealthcare
+  category: Industry-VC-Startup
+  url: https://www.fiercehealthcare.com/rss.xml
+

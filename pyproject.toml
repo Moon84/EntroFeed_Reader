@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "entrofeed"
+version = "0.3.8"
+description = "An intelligent feed reader with LLM-powered recommendations"
+requires-python = ">=3.11"
+license = {text = "AGPL-3.0"}
+keywords = ["rss", "llm", "ai", "feed-reader"]
+
+authors = [
+  {name = "EntroFeed Team", email = "wuyuezhang1984@gmail.com" }
+]
+maintainers = [
+  {name = "EntroFeed Team", email = "wuyuezhang1984@gmail.com" }
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: End Users/Desktop",
+  "Topic :: Office/Business :: News/Diary",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pydantic>=2.0",
+    "feedparser",
+    "aenum",
+    "ruamel.yaml",
+    "ruamel.yaml.string",
+    "fastapi==0.110.1",
+    "uvicorn[standard]",
+    "tinydb",
+    "fastapi-utils>=0.4.1",
+    "jinja2",
+    "requests",
+    "readabilipy",
+    "markdown2[all]",
+    "simplematrixbotlib",
+    "slack_sdk",
+    "ollama",
+    "playwright",
+    "openai",
+    "dashscope",
+    "python-multipart",
+    "typing_inspect",
+    "lmdb",
+    "pyopml",
+    "asyncclick",
+    "textstat",
+    "jira",
+    "pytest",
+    "pytest_asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    # New dependencies for AgentScope and storage
+    "agentscope",
+    "sqlalchemy",
+    "chromadb",
+    # MCP server support
+    "mcp>=1.0.0",
+    # APScheduler for task scheduling
+    "apscheduler>=3.10.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/entrofeed/entrofeed"
+"Bug Reports" = "https://github.com/entrofeed/entrofeed/issues"
+"Funding" = "https://donate.pypi.org"
+"Say Thanks!" = "http://saythanks.io/to/example"
+"Source" = "https://github.com/entrofeed/entrofeed/"
+
+# The following would provide a command line executable called `sample`
+# which executes the function `main` from this package when invoked.
+[project.scripts]
+entrofeed = "src.cli:cli"
+server = "src:run"
+
+
+# This is configuration specific to the `setuptools` build backend.
+# If you are using a different build backend, you will need to change this.
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
