@@ -1,0 +1,54 @@
+# -*- coding: utf-8 -*-
+"""Ntfy Notification Plugin for EntroFeed."""
+
+from json import dumps
+from logging import getLogger
+from os import environ
+from typing import ClassVar, Mapping
+
+import requests
+
+from src.handlers import NotificationHandler
+from src.models import Feed, FeedEntry
+from src.plugins.notification import NotificationPluginBase, NotificationPluginRegistry
+
+logger = getLogger("uvicorn.error")
+
+
+class NtfyNotificationHandler(NotificationPluginBase, NotificationHandler):
+    id: ClassVar[str] = "ntfy"
+    root_url: str = environ.get("NTFY_ROOT_URL", "https://ntfy.sh/")
+    topic: str = environ.get("NTFY_TOPIC")
+    routing: Mapping[str, str] = {}
+
+    async def send_notification(self, feed: Feed, entry: FeedEntry) -> None:
+        if feed.notify_destination:
+            topic = self.routing.get(feed.notify_destination, self.topic)
+            logger.info(f"Sending message to topic {feed.notify_destination} - {topic}")
+        else:
+            topic = self.topic
+            logger.info(f"Sending message to default topic {topic}")
+
+        headers = {
+            "title": "EntroFeed: New Feed Entry",
+            "tags": ["newspaper"],
+            "click": self.make_read_link(entry),
+        }
+
+        actions = [
+            {"action": "view", "label": "Read in EntroFeed", "url": self.make_read_link(entry)},
+            {"action": "view", "label": "View Original", "url": entry.url},
+        ]
+
+        message = f"{feed.name} - {entry.title}"
+
+        data = {"topic": topic, **headers, "message": message, "actions": actions}
+
+        logger.debug(f"request to ntfy: {data}")
+
+        req = requests.post(url=self.root_url, data=dumps(data))
+
+        logger.debug(f"response from ntfy: {req.text}: {req.reason}")
+
+
+NotificationPluginRegistry.register(NtfyNotificationHandler)
