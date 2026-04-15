@@ -10,11 +10,11 @@ install-ci:
 
 .PHONY: run
 run:
-	uvicorn src.app:app --reload --log-level debug --port 8001
+	.venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: run-ci
 run-ci:
-	uvicorn src.app:app &
+	.venv/bin/uvicorn src.app:app &
 
 .PHONY: dev-frontend
 dev-frontend:
@@ -22,7 +22,7 @@ dev-frontend:
 
 .PHONY: dev-backend
 dev-backend:
-	uvicorn src.app:app --reload --log-level debug --port 8001
+	.venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: dev
 dev:
