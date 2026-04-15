@@ -42,8 +42,16 @@ class ContentPluginRegistry:
 # Import all content plugins to trigger auto-registration
 from src.plugins.content import requests, playwright, rsshub
 
+# Re-export handler classes for convenient import
+from src.plugins.content.playwright import PlaywrightContentRetriever
+from src.plugins.content.requests import RequestsContentRetriever
+from src.plugins.content.rsshub import RSSHubContentRetriever
+
 
 __all__ = [
     "ContentPluginBase",
     "ContentPluginRegistry",
+    "PlaywrightContentRetriever",
+    "RequestsContentRetriever",
+    "RSSHubContentRetriever",
 ]

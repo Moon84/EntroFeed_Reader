@@ -9,16 +9,8 @@ from logging import getLogger
 from os import environ
 from typing import Type, Union
 
-from src.content.playwright import PlaywrightContentRetriever
-from src.content.requests import RequestsContentRetriever
-from src.content.rsshub import RSSHubContentRetriever
 from src.db import StorageHandler
 from src.kernel.registry import PluginRegistry
-from src.notification.jira import JiraNotificationHandler
-from src.notification.matrix import MatrixNotificationHandler
-from src.notification.ntfy import NtfyNotificationHandler
-from src.notification.null import NullNotificationHandler
-from src.notification.slack import SlackNotificationHandler
 from src.storage.hybrid import HybridLMDBOfflineStorageHandler
 from src.storage.lmdb import LMDBStorageHandler
 from src.storage.tinydb import TinyDBStorageHandler
@@ -34,6 +26,22 @@ from src.llm import (
     NullLLMHandler,
     OllamaLLMHandler,
     OpenAILLMHandler,
+)
+
+# Import notification handlers from plugins
+from src.plugins.notification import (
+    SlackNotificationHandler,
+    MatrixNotificationHandler,
+    JiraNotificationHandler,
+    NtfyNotificationHandler,
+    NullNotificationHandler,
+)
+
+# Import content handlers from plugins
+from src.plugins.content import (
+    PlaywrightContentRetriever,
+    RequestsContentRetriever,
+    RSSHubContentRetriever,
 )
 
 storage_handlers = {
@@ -65,7 +73,6 @@ llm_handlers = {
     DashScopeVisionHandler.id: DashScopeVisionHandler,
     DummyLLMHandler.id: DummyLLMHandler,
     # redirect null summarization handler to null llm
-    # TODO: Deprecate
     "null_summarization": NullLLMHandler,
 }
 

@@ -58,8 +58,20 @@ class NotificationPluginRegistry:
 # Import all notification plugins to trigger auto-registration
 from src.plugins.notification import slack, matrix, jira, ntfy, null
 
+# Re-export handler classes for convenient import
+from src.plugins.notification.slack import SlackNotificationHandler
+from src.plugins.notification.matrix import MatrixNotificationHandler
+from src.plugins.notification.jira import JiraNotificationHandler
+from src.plugins.notification.ntfy import NtfyNotificationHandler
+from src.plugins.notification.null import NullNotificationHandler
+
 
 __all__ = [
     "NotificationPluginBase",
     "NotificationPluginRegistry",
+    "SlackNotificationHandler",
+    "MatrixNotificationHandler",
+    "JiraNotificationHandler",
+    "NtfyNotificationHandler",
+    "NullNotificationHandler",
 ]
