@@ -17,7 +17,7 @@ import { ReaderProvider } from './context/ReaderContext'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/_app">
       <ReaderProvider>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />

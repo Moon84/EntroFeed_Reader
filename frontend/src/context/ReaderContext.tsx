@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react'
-import { updateEntryState } from '../api/entries'
+import { updateEntryState } from '../client-api/entries'
 
 interface FeedEntryStats {
   totalCount: number
@@ -13,6 +13,7 @@ interface ReaderState {
   setSelectedFeedId: (id: string | null) => void
   readEntryIds: Set<string>
   markAsRead: (id: string) => void
+  markAllAsRead: (ids: string[]) => void
   likedEntries: Record<string, number> // entryId -> liked state (-1, 0, 1)
   toggleLike: (id: string) => void
   setDislike: (id: string) => void
@@ -30,6 +31,7 @@ const ReaderContext = createContext<ReaderState>({
   setSelectedFeedId: () => {},
   readEntryIds: new Set(),
   markAsRead: () => {},
+  markAllAsRead: () => {},
   likedEntries: {},
   toggleLike: () => {},
   setDislike: () => {},
@@ -51,6 +53,16 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
     setReadEntryIds(prev => new Set(prev).add(id))
     // Persist to backend
     updateEntryState(id, { is_read: true }).catch(() => {})
+  }, [])
+
+  const markAllAsRead = useCallback((ids: string[]) => {
+    setReadEntryIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(id))
+      return next
+    })
+    // Persist all to backend
+    ids.forEach(id => updateEntryState(id, { is_read: true }).catch(() => {}))
   }, [])
 
   const toggleLike = useCallback((id: string) => {
@@ -126,6 +138,7 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
       setSelectedFeedId,
       readEntryIds,
       markAsRead,
+      markAllAsRead,
       likedEntries,
       toggleLike,
       setDislike,

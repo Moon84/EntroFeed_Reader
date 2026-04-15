@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { apiGet } from '../api/client'
+import { useNavigate } from 'react-router-dom'
+import { apiGet } from '../client-api/client'
 import { useFeeds } from '../hooks/useFeeds'
 import type { FeedEntry } from '../types'
 import { useReader } from '../context/ReaderContext'
-import { translateText } from '../api/entries'
-import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge } from 'antd'
-import { LikeOutlined, DislikeOutlined, StarFilled, StarOutlined, TranslationOutlined } from '@ant-design/icons'
+import { translateText, getLLMStatus } from '../client-api/entries'
+import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge, message } from 'antd'
+import { LikeOutlined, DislikeOutlined, StarFilled, StarOutlined, TranslationOutlined, CheckOutlined } from '@ant-design/icons'
 import { Layout as AntLayout } from 'antd'
 
 const { Sider, Content } = AntLayout
@@ -17,11 +18,13 @@ type FilterKey = 'all' | 'unread'
 
 export function ReaderView() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const { data: feeds } = useFeeds()
   const {
     selectedFeedId,
     readEntryIds,
     markAsRead,
+    markAllAsRead,
     likedEntries,
     toggleLike,
     setDislike,
@@ -37,12 +40,26 @@ export function ReaderView() {
   const [sortKey, setSortKey] = useState<SortKey>('time')
   const [filterKey, setFilterKey] = useState<FilterKey>('all')
   const [showTranslation, setShowTranslation] = useState(false)
-  const [translationTarget, setTranslationTarget] = useState(i18n.language === 'zh' ? 'en' : 'zh')
   const [translatedContent, setTranslatedContent] = useState<string | null>(null)
   const [isTranslating, setIsTranslating] = useState(false)
+  const [llmAvailable, setLlmAvailable] = useState(true)
+  const [showLLMConfigModal, setShowLLMConfigModal] = useState(false)
 
   const syncStateRef = useRef(syncStateFromEntries)
   const updateStatsRef = useRef(updateFeedStats)
+
+  useEffect(() => {
+    getLLMStatus().then(status => {
+      setLlmAvailable(status.available)
+    }).catch(() => {
+      setLlmAvailable(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    syncStateRef.current = syncStateFromEntries
+    updateStatsRef.current = updateFeedStats
+  })
 
   useEffect(() => {
     syncStateRef.current = syncStateFromEntries
@@ -92,10 +109,10 @@ export function ReaderView() {
     }
     markAsRead(selectedEntry.id)
     let cancelled = false
-    apiGet<{ content: Record<string, unknown> }>(`/read/${selectedEntry.id}?accept=json`)
+    apiGet<Record<string, unknown>>(`/read/${selectedEntry.id}?accept=json`)
       .then(data => {
         if (cancelled) return
-        setEntryContent(data.content)
+        setEntryContent(data)
       })
       .catch(() => {
         if (cancelled) return
@@ -130,12 +147,29 @@ export function ReaderView() {
     if (!selectedEntry || !entryContent) return
     const content = (entryContent as any)?.content || (entryContent as any)?.preview
     if (!content) return
+
+    // Auto-detect target language based on UI language
+    // Always translate TO the UI language
+    const targetLang = i18n.language === 'zh' ? 'zh' : 'en'
+
+    // Detect source language: count Chinese characters
+    const chineseChars = (content.match(/[\u4e00-\u9fff]/g) || []).length
+    const sourceLang = chineseChars / content.length > 0.3 ? 'zh' : 'en'
+
+    // If source and target are the same, no need to translate
+    if (sourceLang === targetLang) {
+      message.info(i18n.language === 'zh' ? '文章已是中文' : 'Article is already in English')
+      return
+    }
+
     setIsTranslating(true)
     try {
-      const result = await translateText(content, translationTarget)
+      const result = await translateText(content, targetLang)
       if (result.success && result.translation) {
         setTranslatedContent(result.translation.text)
         setShowTranslation(true)
+      } else if (result.error) {
+        message.error(result.error)
       }
     } catch (e) {
       console.error('Translation failed:', e)
@@ -146,12 +180,21 @@ export function ReaderView() {
 
   return (
     <AntLayout style={{ height: 'calc(100vh - 48px)', margin: '-24px -32px', overflow: 'hidden' }}>
-      <Sider width={380} style={{ background: '#f7f8fa', borderRight: '1px solid #e5e7eb' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Sider width={380} style={{ background: '#f7f8fa', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <Text strong>{selectedFeed ? selectedFeed.name : t('nav.recent')}</Text>
-          <Badge count={displayedEntries.length} style={{ backgroundColor: '#6b7280' }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Badge count={displayedEntries.filter(e => !readEntryIds.has(e.id)).length} style={{ backgroundColor: '#6b7280' }} />
+            <Button
+              size="small"
+              type="text"
+              icon={<CheckOutlined />}
+              onClick={() => markAllAsRead(displayedEntries.map(e => e.id))}
+              title={t('article.markAllRead') || 'Mark all as read'}
+            />
+          </div>
         </div>
-        <div style={{ padding: '8px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 16 }}>
+        <div style={{ padding: '8px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 16, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Text type="secondary" style={{ fontSize: 11 }}>{t('article.sort')}:</Text>
             <Select size="small" value={sortKey} onChange={setSortKey} style={{ width: 80 }}>
@@ -248,18 +291,18 @@ export function ReaderView() {
       </Sider>
 
       <Content style={{ background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {selectedEntry && entryContent ? (
+        {selectedEntry ? (
           <>
             <div style={{ padding: 20, borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
               <Title level={4} style={{ marginBottom: 8 }}>{selectedEntry.title}</Title>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#6b7280', flexWrap: 'wrap' }}>
-                <Text type="secondary">{(entryContent as any).feed_name}</Text>
+                <Text type="secondary">{(entryContent as any)?.feed_name || selectedEntry.feed_name || ''}</Text>
                 <span>·</span>
                 <Text type="secondary">{formatDate(selectedEntry.published_at)}</Text>
-                {(entryContent as any).word_count && (
+                {(entryContent as any)?.word_count && (
                   <>
                     <span>·</span>
-                    <Text type="secondary">{(entryContent as any).word_count} {t('article.words')}</Text>
+                    <Text type="secondary">{(entryContent as any)?.word_count} {t('article.words')}</Text>
                   </>
                 )}
                 <span>·</span>
@@ -307,18 +350,10 @@ export function ReaderView() {
                   icon={<TranslationOutlined />}
                   onClick={handleTranslate}
                   loading={isTranslating}
+                  disabled={!llmAvailable}
                 >
                   {t('article.translate')}
                 </Button>
-                <Select
-                  size="small"
-                  value={translationTarget}
-                  onChange={setTranslationTarget}
-                  style={{ width: 80 }}
-                >
-                  <Select.Option value="zh">{t('common.languageChinese')}</Select.Option>
-                  <Select.Option value="en">{t('common.languageEnglish')}</Select.Option>
-                </Select>
               </div>
             </div>
 
@@ -332,7 +367,27 @@ export function ReaderView() {
               <div dangerouslySetInnerHTML={{ __html: translatedContent || '' }} style={{ lineHeight: 1.8 }} />
             </Modal>
 
-            <div style={{ flex: 1, overflow: 'auto', padding: 24, lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: (entryContent as any).content || '' }} />
+            <Modal
+              title="⚙️ LLM 配置"
+              open={showLLMConfigModal}
+              onCancel={() => setShowLLMConfigModal(false)}
+              footer={[
+                <Button key="cancel" onClick={() => setShowLLMConfigModal(false)}>
+                  取消
+                </Button>,
+                <Button key="settings" type="primary" onClick={() => {
+                  setShowLLMConfigModal(false)
+                  navigate('/settings')
+                }}>
+                  去设置
+                </Button>
+              ]}
+            >
+              <p>翻译功能需要配置 LLM API。</p>
+              <p>请前往设置页面配置 LLM 提供者。</p>
+            </Modal>
+
+            <div style={{ flex: 1, overflow: 'auto', padding: 24, lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: (entryContent as any)?.content || '' }} />
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>

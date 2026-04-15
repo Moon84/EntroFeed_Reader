@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { getEntryContent } from '../api/entries'
+import { getEntryContent } from '../client-api/entries'
 import { useSimilarRecommendations } from '../hooks/useRecommendations'
 import { Card, Typography, Button, Skeleton, Alert, Tag, List } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'

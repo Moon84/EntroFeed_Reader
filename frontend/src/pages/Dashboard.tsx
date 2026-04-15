@@ -6,7 +6,7 @@ import { UnorderedListOutlined, StarOutlined, SettingOutlined, ClockCircleOutlin
 import { useRecentEntries } from '../hooks/useEntries'
 import { useFeeds } from '../hooks/useFeeds'
 import { useInterestRecommendations } from '../hooks/useRecommendations'
-import { getLLMStatus } from '../api/entries'
+import { getLLMStatus } from '../client-api/entries'
 
 const { Title, Text } = Typography
 

@@ -1,6 +1,7 @@
-import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'
+import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Layout as AntLayout, Menu, Badge, Switch, Typography } from 'antd'
+import { useQuery } from '@tanstack/react-query'
+import { Layout as AntLayout, Menu, Badge, Switch, Typography, Tag } from 'antd'
 import {
   DashboardOutlined,
   ReadOutlined,
@@ -12,9 +13,34 @@ import {
 } from '@ant-design/icons'
 import { useFeeds } from '../hooks/useFeeds'
 import { useReader } from '../context/ReaderContext'
+import { getLLMStatus } from '../client-api/entries'
 
 const { Sider, Content } = AntLayout
 const { Text } = Typography
+
+interface LLMStatus {
+  available: boolean
+  provider: string
+  model: string
+  error?: string
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    total_tokens: number
+    requests: number
+    limit: number
+  }
+}
+
+// Helper to get favicon URL from feed URL
+function getFaviconUrl(feedUrl: string): string {
+  try {
+    const url = new URL(feedUrl)
+    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`
+  } catch {
+    return ''
+  }
+}
 
 const NAV_ITEMS = [
   { path: '/', labelKey: 'nav.dashboard', icon: <DashboardOutlined /> },
@@ -32,6 +58,11 @@ export function Layout() {
   const navigate = useNavigate()
   const { data: feeds } = useFeeds()
   const { selectedFeedId, setSelectedFeedId, feedEntryStats } = useReader()
+  const { data: llmStatus } = useQuery<LLMStatus>({
+    queryKey: ['llm-status'],
+    queryFn: getLLMStatus,
+    refetchInterval: 60000, // Refresh every minute
+  })
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'zh' ? 'en' : 'zh'
@@ -61,9 +92,28 @@ export function Layout() {
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
-      <Sider width={260} style={{ background: '#fff', borderRight: '1px solid #e5e7eb' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
-          <Text strong style={{ fontSize: 18 }}>📖 EntroFeed</Text>
+      <Sider width={260} style={{ background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <img
+              src="/assets/EntroFeed_logo.png"
+              alt="EntroFeed"
+              style={{ height: 32 }}
+            />
+            <Text strong style={{ fontSize: 16 }}>{i18n.language === 'zh' ? '熵流' : 'EntroFeed'}</Text>
+          </div>
+          {llmStatus && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Tag color={llmStatus.available ? 'green' : 'red'} style={{ margin: 0, fontSize: 11 }}>
+                {llmStatus.available ? `${llmStatus.provider}` : 'LLM Offline'}
+              </Tag>
+              {llmStatus.available && llmStatus.usage && (
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  📊 {llmStatus.usage.total_tokens.toLocaleString()} tokens
+                </Text>
+              )}
+            </div>
+          )}
         </div>
 
         <Menu
@@ -78,15 +128,16 @@ export function Layout() {
           }))}
         />
 
-        <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 'auto', padding: '12px' }}>
+        <div style={{ borderTop: '1px solid #e5e7eb', padding: '12px' }}>
           <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', padding: '8px 12px', display: 'block' }}>
             {t('dashboard.feeds')}
           </Text>
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
             {sortedFeeds.slice(0, 20).map((feed) => {
               const dynamicStats = feedEntryStats[feed.id]
               const isActive = location.pathname === '/reader' && selectedFeedId === feed.id
               const unreadCount = dynamicStats?.unreadCount ?? 0
+              const importantCount = dynamicStats?.importantCount ?? 0
               const hasStats = dynamicStats && dynamicStats.totalCount > 0
 
               return (
@@ -104,24 +155,47 @@ export function Layout() {
                     color: isActive ? '#2563eb' : '#666',
                   }}
                 >
-                  <div
+                  <img
+                    src={getFaviconUrl(feed.url)}
+                    alt=""
                     style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      objectFit: 'contain',
+                    }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                      ;(e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                  <span
+                    className="feed-letter"
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
                       backgroundColor: '#f3f4f6',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 600,
+                      flexShrink: 0,
                     }}
                   >
                     {feed.name.charAt(0).toUpperCase()}
-                  </div>
+                  </span>
                   <span style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {feed.name}
                   </span>
+                  {hasStats && importantCount > 0 && (
+                    <Badge
+                      count={importantCount}
+                      size="small"
+                      style={{ backgroundColor: '#f59e0b' }}
+                    />
+                  )}
                   {hasStats && (
                     <Badge
                       count={unreadCount}
@@ -133,11 +207,6 @@ export function Layout() {
               )
             })}
           </div>
-          {feeds && feeds.length > 20 && (
-            <Link to="/feeds" style={{ color: '#2563eb', fontSize: 12, padding: '8px 12px', display: 'block' }}>
-              + {feeds.length - 20} more
-            </Link>
-          )}
         </div>
 
         <div style={{ padding: 12, borderTop: '1px solid #e5e7eb' }}>

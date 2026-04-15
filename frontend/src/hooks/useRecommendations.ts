@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getInterestRecommendations, getTrendingRecommendations, getSimilarRecommendations } from '../api/recommendations'
+import { getInterestRecommendations, getTrendingRecommendations, getSimilarRecommendations } from '../client-api/recommendations'
 import type { Recommendation } from '../types'
 
 export function useInterestRecommendations(limit = 20) {

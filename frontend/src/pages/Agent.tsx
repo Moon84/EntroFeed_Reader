@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { XProvider, Conversations, Sender } from '@ant-design/x'
 import { theme, Button, Typography, Card, List } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { apiGet, apiPostJson } from '../api/client'
+import { apiGet, apiPostJson } from '../client-api/client'
 
 const { Title, Text } = Typography
 

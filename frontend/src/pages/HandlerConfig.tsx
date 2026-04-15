@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getHandlerSchema, updateHandler } from '../api/settings'
+import { getHandlerSchema, updateHandler } from '../client-api/settings'
 import { Card, Form, Input, Switch, Button, Typography, Skeleton, Divider } from 'antd'
 
 const { Title, Text } = Typography

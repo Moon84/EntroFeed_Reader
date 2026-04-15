@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getAbout } from '../api/settings'
+import { getAbout } from '../client-api/settings'
 import { useBackup } from '../hooks/useSettings'
 import { Link } from 'react-router-dom'
 import { Card, Typography, Button, List, Skeleton } from 'antd'

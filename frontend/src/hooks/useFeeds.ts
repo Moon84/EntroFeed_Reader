@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listFeeds, refreshFeed, deleteFeed, updateFeed, importOpml, exportOpml, type FeedFormData } from '../api/feeds'
+import { listFeeds, refreshFeed, deleteFeed, updateFeed, importOpml, exportOpml, type FeedFormData } from '../client-api/feeds'
 import type { Feed } from '../types'
 
 export function useFeeds() {

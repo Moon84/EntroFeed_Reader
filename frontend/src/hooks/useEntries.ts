@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { listFeedEntries } from '../api/entries'
+import { listFeedEntries } from '../client-api/entries'
 import type { FeedEntry } from '../types'
 
 export function useEntries(feedId?: string) {
