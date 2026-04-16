@@ -8,13 +8,18 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 from pydantic import BaseModel
 
 from src.kernel.registry import PluginBase, PluginRegistry
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 
 
 class ModelWrapperBase(PluginBase):
     """Base class for all LLM providers."""
 
     id: ClassVar[str] = "base_llm"
+
+    @classmethod
+    def get_plugin_type(cls) -> str:
+        """Return the plugin type string."""
+        return "llm"
 
     @abstractmethod
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
@@ -29,6 +34,24 @@ class ModelWrapperBase(PluginBase):
             {"role": "system", "content": system},
             {"role": "user", "content": prompt}
         ], **kwargs)
+
+    def chat_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict[str, Any]],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Chat with function calling support.
+
+        Args:
+            messages: List of message dicts with role and content
+            tools: List of tool definitions in OpenAI format
+            **kwargs: Additional arguments
+
+        Returns:
+            Dict with 'content' (str) and optionally 'tool_calls' list
+        """
+        raise NotImplementedError("Subclass must implement chat_with_tools")
 
     def get_summarization_prompt(self, mk: str) -> str:
         return f"Summarize this article:\n\n{mk}"

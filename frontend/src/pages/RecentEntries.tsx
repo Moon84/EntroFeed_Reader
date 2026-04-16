@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../client-api/client'
 import type { FeedEntry } from '../types'
 import { useReader } from '../context/ReaderContext'
 import { translateText, getLLMStatus } from '../client-api/entries'
-import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge, message } from 'antd'
+import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge, message, Checkbox } from 'antd'
+import { RobotOutlined } from '@ant-design/icons'
 import { LikeOutlined, DislikeOutlined, StarFilled, StarOutlined, TranslationOutlined, CheckOutlined } from '@ant-design/icons'
 import { Layout as AntLayout } from 'antd'
 
@@ -16,6 +18,7 @@ type FilterKey = 'all' | 'unread'
 
 export function RecentEntries() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const {
     readEntryIds,
     markAsRead,
@@ -38,6 +41,7 @@ export function RecentEntries() {
   const [translatedContent, setTranslatedContent] = useState<string | null>(null)
   const [isTranslating, setIsTranslating] = useState(false)
   const [llmAvailable, setLlmAvailable] = useState(true)
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set())
 
   const syncStateRef = useRef(syncStateFromEntries)
 
@@ -147,9 +151,31 @@ export function RecentEntries() {
         {/* Wrap all children in a flex column container so flex:1 works */}
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            <Text strong>{t('nav.recent')}</Text>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Checkbox
+                checked={selectedEntryIds.size === displayedEntries.length && displayedEntries.length > 0}
+                indeterminate={selectedEntryIds.size > 0 && selectedEntryIds.size < displayedEntries.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedEntryIds(new Set(displayedEntries.map(e => e.id)))
+                  } else {
+                    setSelectedEntryIds(new Set())
+                  }
+                }}
+              />
+              <Text strong>{t('nav.recent')}</Text>
               <Badge count={displayedEntries.filter(e => !readEntryIds.has(e.id)).length} style={{ backgroundColor: '#6b7280' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {selectedEntryIds.size > 0 && (
+                <Button size="small" type="primary" icon={<RobotOutlined />} onClick={() => {
+                  const ids = Array.from(selectedEntryIds)
+                  localStorage.setItem('entrofeed_pending_articles', JSON.stringify(ids))
+                  navigate('/agent')
+                }}>
+                  {selectedEntryIds.size} → AI
+                </Button>
+              )}
               <Button size="small" type="text" icon={<CheckOutlined />} onClick={() => markAllAsRead(displayedEntries.map(e => e.id))} title={t('article.markAllRead') || 'Mark all as read'} />
             </div>
           </div>
@@ -194,13 +220,29 @@ export function RecentEntries() {
                     }}
                   >
                     <div style={{ display: 'flex', gap: 12 }}>
+                      <Checkbox
+                        checked={selectedEntryIds.has(entry.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setSelectedEntryIds(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(entry.id)
+                            else next.delete(entry.id)
+                            return next
+                          })
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ flexShrink: 0 }}
+                      />
                       <div
+                        onClick={() => setSelectedEntry(entry)}
                         style={{
                           width: 36, height: 36, borderRadius: 8, display: 'flex',
                           alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12,
                           flexShrink: 0,
                           background: (entry.total_score ?? 0) >= 0.7 ? '#dcfce7' : (entry.total_score ?? 0) >= 0.4 ? '#fef3c7' : '#f3f4f6',
                           color: (entry.total_score ?? 0) >= 0.7 ? '#15803d' : (entry.total_score ?? 0) >= 0.4 ? '#b45309' : '#6b7280',
+                          cursor: 'pointer',
                         }}
                       >
                         {isImportant && <StarOutlined style={{ fontSize: 10, marginRight: 2 }} />}
@@ -263,6 +305,16 @@ export function RecentEntries() {
                 <Button size="small" icon={<DislikeOutlined />} type={getLikeState(selectedEntry) === -1 ? 'primary' : 'default'} danger={getLikeState(selectedEntry) === -1} onClick={() => setDislike(selectedEntry.id)}>{t('article.dislike')}</Button>
                 <Button size="small" icon={isFavorited(selectedEntry) ? <StarFilled /> : <StarOutlined />} type={isFavorited(selectedEntry) ? 'primary' : 'default'} onClick={() => toggleFavorite(selectedEntry.id)}>{t('article.favorite')}</Button>
                 <Button size="small" icon={<TranslationOutlined />} onClick={handleTranslate} loading={isTranslating} disabled={!llmAvailable}>{t('article.translate')}</Button>
+                <Button size="small" icon={<RobotOutlined />} onClick={() => {
+                  // Send entry IDs (single or multi) to AI for smart content retrieval
+                  const ids = selectedEntryIds.size > 0
+                    ? Array.from(selectedEntryIds)
+                    : [selectedEntry.id]
+                  localStorage.setItem('entrofeed_pending_articles', JSON.stringify(ids))
+                  navigate('/agent')
+                }}>
+                  {t('agent.title') || 'AI'}
+                </Button>
               </div>
             </div>
 

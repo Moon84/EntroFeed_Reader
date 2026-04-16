@@ -8,7 +8,7 @@ from openai import OpenAI
 from pydantic import Field
 
 from src.handlers import LLMHandler
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
 
@@ -23,6 +23,24 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
     max_tokens: int = Field(default=4000)
 
     id: ClassVar[str] = "dashscope"
+    required_env: ClassVar[List[str]] = ["DASHSCOPE_API_KEY"]
+
+    @classmethod
+    def _check_api_connectivity(cls) -> bool:
+        """Check if DashScope API is reachable."""
+        import requests
+        try:
+            # Lightweight check - just verify the API endpoint is reachable
+            resp = requests.get(
+                "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+                timeout=5,
+                headers={"Authorization": f"Bearer {os.getenv('DASHSCOPE_API_KEY', '')}"}
+            )
+            return resp.status_code in (200, 401)  # 401 means auth issue, but API is reachable
+        except requests.RequestException:
+            return False
+
+    _check_fn: ClassVar = _check_api_connectivity
 
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         """Make chat completion call to DashScope."""
@@ -50,6 +68,59 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
             system=system,
             prompt=self.get_summarization_prompt(mk)
         )
+
+    def chat_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict[str, Any]],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Chat with function calling support for DashScope."""
+        api_key = self.api_key or os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise ValueError("DASHSCOPE_API_KEY not set")
+
+        client = OpenAI(api_key=api_key, base_url=self.base_url)
+
+        # Convert tools to DashScope format
+        dashscope_tools = []
+        for tool in tools:
+            func = tool.get('function', {})
+            dashscope_tools.append({
+                "type": "function",
+                "function": {
+                    "name": func.get('name'),
+                    "description": func.get('description'),
+                    "parameters": func.get('parameters', {"type": "object", "properties": {}}),
+                }
+            })
+
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            tools=dashscope_tools,
+            tool_choice="auto",
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **kwargs
+        )
+
+        message = response.choices[0].message
+        result: Dict[str, Any] = {"content": message.content or ""}
+
+        if message.tool_calls:
+            result["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }
+                }
+                for tc in message.tool_calls
+            ]
+
+        return result
 
 
 class DashScopeVisionHandler(ModelWrapperBase, LLMHandler):

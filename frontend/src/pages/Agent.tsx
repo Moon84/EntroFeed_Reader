@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { XProvider, Conversations, Sender } from '@ant-design/x'
-import { theme, Button, Typography, Card, List } from 'antd'
+import { theme, Button, Typography, Card, List, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPostJson } from '../client-api/client'
+import type { FeedEntry } from '../types'
 
 const { Title, Text } = Typography
 
@@ -11,6 +12,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp?: number
+  attachments?: FeedEntry[]
 }
 
 interface Session {
@@ -23,6 +25,71 @@ interface Session {
 
 const SESSION_STORAGE_KEY = 'entrofeed_agent_session'
 
+function AttachmentCard({ entry, onRemove }: { entry: FeedEntry; onRemove?: () => void }) {
+  const score = entry.total_score ?? 0
+  const scoreColor = score >= 0.7 ? '#15803d' : score >= 0.4 ? '#b45309' : '#6b7280'
+  const scoreBg = score >= 0.7 ? '#dcfce7' : score >= 0.4 ? '#fef3c7' : '#f3f4f6'
+
+  return (
+    <Card
+      size="small"
+      style={{ marginBottom: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}
+      bodyStyle={{ padding: 12 }}
+      extra={onRemove ? <Button size="small" type="text" onClick={onRemove}>×</Button> : undefined}
+    >
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div
+          style={{
+            width: 36, height: 36, borderRadius: 8, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11,
+            flexShrink: 0, background: scoreBg, color: scoreColor,
+          }}
+        >
+          {Math.round(score * 100)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {entry.title}
+          </div>
+          <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span>{entry.feed_name || 'Unknown source'}</span>
+            {entry.published_at && (
+              <>
+                <span>·</span>
+                <span>{new Date(entry.published_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}</span>
+              </>
+            )}
+            {entry.tags?.slice(0, 3).map((tag, i) => (
+              <Tag key={i} style={{ margin: 0, fontSize: 10 }}>{tag.name}</Tag>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function AttachmentSection({ entries, onRemove }: { entries: FeedEntry[]; onRemove?: (id: string) => void }) {
+  if (entries.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          📎 {entries.length} article{entries.length > 1 ? 's' : ''} selected for analysis
+        </Text>
+      </div>
+      {entries.map(entry => (
+        <AttachmentCard
+          key={entry.id}
+          entry={entry}
+          onRemove={onRemove ? () => onRemove(entry.id) : undefined}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function Agent() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
@@ -31,7 +98,9 @@ export function Agent() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [showSessionList, setShowSessionList] = useState(false)
+  const [pendingAttachments, setPendingAttachments] = useState<FeedEntry[]>([])
   const conversationsRef = useRef<HTMLDivElement>(null)
+  const pendingArticleSent = useRef(false)
 
   useEffect(() => {
     loadSessions()
@@ -39,7 +108,41 @@ export function Agent() {
     if (savedSessionId) {
       loadSession(savedSessionId)
     }
+
+    // Handle pending articles sent from reader
+    const pendingIds = localStorage.getItem('entrofeed_pending_articles')
+    if (pendingIds && !pendingArticleSent.current) {
+      pendingArticleSent.current = true
+      localStorage.removeItem('entrofeed_pending_articles')
+      const ids: string[] = JSON.parse(pendingIds)
+      // Fetch entries for these IDs
+      fetchAndAttachEntries(ids)
+    }
   }, [])
+
+  const fetchAndAttachEntries = async (ids: string[]) => {
+    try {
+      // Fetch entries in parallel - use list-feed-entries which returns all, then filter
+      const allEntries = await apiGet<FeedEntry[]>('/util/list-feed-entries')
+      const matched = allEntries.filter(e => ids.includes(e.id))
+      if (matched.length > 0) {
+        setPendingAttachments(matched)
+      } else {
+        // Fallback: try fetching each individually
+        const results = await Promise.allSettled(
+          ids.map(id => apiGet<FeedEntry>(`/read/${id}?accept=json`).catch(() => null))
+        )
+        const entries = results
+          .filter((r): r is PromiseFulfilledResult<FeedEntry> => r.status === 'fulfilled' && r.value !== null)
+          .map(r => r.value)
+        if (entries.length > 0) {
+          setPendingAttachments(entries)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch pending entries:', e)
+    }
+  }
 
   const loadSessions = async () => {
     try {
@@ -119,25 +222,50 @@ export function Agent() {
     }
   }
 
+  const buildMessageWithAttachments = (userText: string, attachments: FeedEntry[]): string => {
+    if (attachments.length === 0) return userText
+
+    const articlesSection = attachments.map((e, i) =>
+      `[Article ${i + 1}]
+ID: ${e.id}
+Title: ${e.title}
+Source: ${e.feed_name || 'Unknown'}
+URL: ${e.url}
+Published: ${e.published_at}
+Score: ${Math.round((e.total_score ?? 0) * 100)}/100
+${e.tags?.length ? `Tags: ${e.tags.map(t => t.name).join(', ')}` : ''}
+${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
+    ).join('\n\n')
+
+    return `I'm sharing ${attachments.length} article${attachments.length > 1 ? 's' : ''} for your analysis:\n\n${articlesSection}\n\n---\n\nMy question/request: ${userText}`
+  }
+
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim()) return
+
+    const attachmentsToSend = [...pendingAttachments]
+    const messageText = buildMessageWithAttachments(value, attachmentsToSend)
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: value,
+      content: messageText,
       timestamp: Date.now(),
+      attachments: attachmentsToSend,
     }
 
     setMessages(prev => [...prev, userMessage])
     setLoading(true)
     setInputValue('')
 
+    // Keep attachments visible (they stay until explicitly removed)
+    // Don't clear pendingAttachments - user might want to ask follow-ups about same articles
+
     try {
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: value, session_id: currentSessionId }),
+        body: JSON.stringify({ message: messageText, session_id: currentSessionId }),
       })
 
       const data = await response.json()
@@ -167,9 +295,18 @@ export function Agent() {
     } finally {
       setLoading(false)
     }
-  }, [currentSessionId])
+  }, [currentSessionId, pendingAttachments])
 
-  const chatMessages = messages.map(msg => ({
+  const removeAttachment = (id: string) => {
+    setPendingAttachments(prev => prev.filter(e => e.id !== id))
+  }
+
+  const clearAttachments = () => {
+    setPendingAttachments([])
+  }
+
+  // Custom message renderer that shows attachments for user messages
+  const chatItems = messages.map(msg => ({
     key: msg.id,
     role: msg.role as 'user' | 'assistant',
     content: msg.content,
@@ -186,7 +323,6 @@ export function Agent() {
     { label: t('agent.trendingArticles'), value: t('agent.whatTrending') },
     { label: t('agent.dailyDigest'), value: t('agent.generateDigest') },
     { label: t('agent.manageInterests'), value: t('agent.helpManageInterests') },
-    { label: t('agent.translateArticle'), value: t('agent.translateToChinese') },
   ]
 
   const currentSession = sessions.find(s => s.id === currentSessionId)
@@ -243,7 +379,20 @@ export function Agent() {
           theme={{ algorithm: theme.defaultAlgorithm, token: { colorPrimary: '#2563eb' } }}
         >
           <div style={{ flex: 1, overflow: 'auto', padding: 16 }} ref={conversationsRef}>
-            {messages.length === 0 ? (
+            {/* Attachment section */}
+            {pendingAttachments.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    📎 {pendingAttachments.length} article{pendingAttachments.length > 1 ? 's' : ''} attached — AI will fetch content automatically
+                  </Text>
+                  <Button size="small" type="text" onClick={clearAttachments}>Clear all</Button>
+                </div>
+                <AttachmentSection entries={pendingAttachments} onRemove={removeAttachment} />
+              </div>
+            )}
+
+            {messages.length === 0 && pendingAttachments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
                 <Title level={4} style={{ marginBottom: 8 }}>{t('agent.title')}</Title>
@@ -259,15 +408,20 @@ export function Agent() {
                 </div>
               </div>
             ) : (
-              <Conversations items={chatMessages} />
+              <Conversations items={chatItems} />
             )}
           </div>
 
           {messages.length > 0 && (
-            <div style={{ padding: '8px 16px', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ padding: '8px 16px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8 }}>
               <Button size="small" onClick={clearCurrentSession}>
                 🗑️ {t('agent.clear', 'Clear')}
               </Button>
+              {pendingAttachments.length > 0 && (
+                <Button size="small" onClick={clearAttachments}>
+                  Clear articles
+                </Button>
+              )}
             </div>
           )}
 
@@ -277,7 +431,11 @@ export function Agent() {
               onChange={setInputValue}
               onSubmit={handleSubmit}
               loading={loading}
-              placeholder={t('agent.placeholder', 'Ask me about your feeds, recommendations...')}
+              placeholder={
+                pendingAttachments.length > 0
+                  ? 'Ask about the attached articles, or type your question...'
+                  : t('agent.placeholder', 'Ask me about your feeds, recommendations...')
+              }
             />
           </div>
         </XProvider>

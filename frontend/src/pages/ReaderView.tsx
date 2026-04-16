@@ -6,8 +6,8 @@ import { useFeeds } from '../hooks/useFeeds'
 import type { FeedEntry } from '../types'
 import { useReader } from '../context/ReaderContext'
 import { translateText, getLLMStatus } from '../client-api/entries'
-import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge, message } from 'antd'
-import { LikeOutlined, DislikeOutlined, StarFilled, StarOutlined, TranslationOutlined, CheckOutlined } from '@ant-design/icons'
+import { Button, Select, Typography, Tag, Modal, Spin, Empty, Badge, message, Checkbox } from 'antd'
+import { LikeOutlined, DislikeOutlined, StarFilled, StarOutlined, TranslationOutlined, CheckOutlined, RobotOutlined } from '@ant-design/icons'
 import { Layout as AntLayout } from 'antd'
 
 const { Sider, Content } = AntLayout
@@ -45,6 +45,7 @@ export function ReaderView() {
   const [isTranslating, setIsTranslating] = useState(false)
   const [llmAvailable, setLlmAvailable] = useState(true)
   const [showLLMConfigModal, setShowLLMConfigModal] = useState(false)
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set())
 
   const syncStateRef = useRef(syncStateFromEntries)
   const updateStatsRef = useRef(updateFeedStats)
@@ -189,9 +190,31 @@ export function ReaderView() {
       <Sider width={380} style={{ background: '#f7f8fa', borderRight: '1px solid #e5e7eb', height: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            <Text strong>{selectedFeed ? selectedFeed.name : t('nav.recent')}</Text>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Checkbox
+                checked={selectedEntryIds.size === displayedEntries.length && displayedEntries.length > 0}
+                indeterminate={selectedEntryIds.size > 0 && selectedEntryIds.size < displayedEntries.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedEntryIds(new Set(displayedEntries.map(e => e.id)))
+                  } else {
+                    setSelectedEntryIds(new Set())
+                  }
+                }}
+              />
+              <Text strong>{selectedFeed ? selectedFeed.name : t('nav.recent')}</Text>
               <Badge count={displayedEntries.filter(e => !readEntryIds.has(e.id)).length} style={{ backgroundColor: '#6b7280' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {selectedEntryIds.size > 0 && (
+                <Button size="small" type="primary" icon={<RobotOutlined />} onClick={() => {
+                  const ids = Array.from(selectedEntryIds)
+                  localStorage.setItem('entrofeed_pending_articles', JSON.stringify(ids))
+                  navigate('/agent')
+                }}>
+                  {selectedEntryIds.size} → AI
+                </Button>
+              )}
               <Button
                 size="small"
                 type="text"
@@ -244,7 +267,22 @@ export function ReaderView() {
                     }}
                   >
                     <div style={{ display: 'flex', gap: 12 }}>
+                      <Checkbox
+                        checked={selectedEntryIds.has(entry.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setSelectedEntryIds(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(entry.id)
+                            else next.delete(entry.id)
+                            return next
+                          })
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ flexShrink: 0 }}
+                      />
                       <div
+                        onClick={() => setSelectedEntry(entry)}
                         style={{
                           width: 36,
                           height: 36,
@@ -361,6 +399,19 @@ export function ReaderView() {
                   disabled={!llmAvailable}
                 >
                   {t('article.translate')}
+                </Button>
+                <Button
+                  size="small"
+                  icon={<RobotOutlined />}
+                  onClick={() => {
+                    const ids = selectedEntryIds.size > 0
+                      ? Array.from(selectedEntryIds)
+                      : [selectedEntry.id]
+                    localStorage.setItem('entrofeed_pending_articles', JSON.stringify(ids))
+                    navigate('/agent')
+                  }}
+                >
+                  {t('agent.title') || 'AI'}
                 </Button>
               </div>
             </div>
