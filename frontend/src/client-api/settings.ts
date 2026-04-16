@@ -2,8 +2,8 @@ import { apiGet, apiPost } from './client'
 import type { GlobalSettings, AboutInfo, Handler } from '../types'
 
 export async function getSettings(): Promise<GlobalSettings> {
-  const data = await apiGet<GlobalSettings>('/api/about')
-  return data as unknown as GlobalSettings
+  const data = await apiGet<{version: string; python_version: string; fastapi_version: string; docker: boolean; storage_handler: string; github: string; settings: GlobalSettings}>('/api/about')
+  return data.settings
 }
 
 export async function getAbout(): Promise<AboutInfo & { settings: GlobalSettings }> {
@@ -55,4 +55,36 @@ export async function restore(file: File): Promise<void> {
   const form = new FormData()
   form.append('file', file)
   await apiPost('/api/restore/', form, true)
+}
+
+// ============ User Profile (user.md) ============
+
+export interface UserProfileStatus {
+  exists: boolean
+  is_empty: boolean
+  content_length: number
+  path: string
+}
+
+export interface UserProfileResponse {
+  content: string
+  status: UserProfileStatus
+}
+
+export async function getUserProfile(): Promise<UserProfileResponse> {
+  return apiGet<UserProfileResponse>('/api/user/profile')
+}
+
+export async function saveUserProfile(content: string): Promise<{ success: boolean; interests: unknown[]; count: number }> {
+  const res = await fetch('/api/user/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json()
+}
+
+export async function getUserProfileStatus(): Promise<UserProfileStatus> {
+  return apiGet<UserProfileStatus>('/api/user/profile/status')
 }

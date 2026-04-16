@@ -36,6 +36,7 @@ export function ReaderView() {
   const [entries, setEntries] = useState<FeedEntry[]>([])
   const [selectedEntry, setSelectedEntry] = useState<FeedEntry | null>(null)
   const [entryContent, setEntryContent] = useState<Record<string, unknown> | null>(null)
+  const [isLoadingContent, setIsLoadingContent] = useState(false)
   const [isLoadingEntries, setIsLoadingEntries] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('time')
   const [filterKey, setFilterKey] = useState<FilterKey>('all')
@@ -105,18 +106,23 @@ export function ReaderView() {
   useEffect(() => {
     if (!selectedEntry) {
       setEntryContent(null)
+      setIsLoadingContent(false)
       return
     }
     markAsRead(selectedEntry.id)
+    setIsLoadingContent(true)
+    setEntryContent(null)  // Clear old content immediately
     let cancelled = false
     apiGet<Record<string, unknown>>(`/read/${selectedEntry.id}?accept=json`)
       .then(data => {
         if (cancelled) return
         setEntryContent(data)
+        setIsLoadingContent(false)
       })
       .catch(() => {
         if (cancelled) return
         setEntryContent(null)
+        setIsLoadingContent(false)
       })
     return () => { cancelled = true }
   }, [selectedEntry, markAsRead])
@@ -180,117 +186,119 @@ export function ReaderView() {
 
   return (
     <AntLayout style={{ height: 'calc(100vh - 48px)', margin: '-24px -32px', overflow: 'hidden' }}>
-      <Sider width={380} style={{ background: '#f7f8fa', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <Text strong>{selectedFeed ? selectedFeed.name : t('nav.recent')}</Text>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Badge count={displayedEntries.filter(e => !readEntryIds.has(e.id)).length} style={{ backgroundColor: '#6b7280' }} />
-            <Button
-              size="small"
-              type="text"
-              icon={<CheckOutlined />}
-              onClick={() => markAllAsRead(displayedEntries.map(e => e.id))}
-              title={t('article.markAllRead') || 'Mark all as read'}
-            />
+      <Sider width={380} style={{ background: '#f7f8fa', borderRight: '1px solid #e5e7eb', height: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <Text strong>{selectedFeed ? selectedFeed.name : t('nav.recent')}</Text>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Badge count={displayedEntries.filter(e => !readEntryIds.has(e.id)).length} style={{ backgroundColor: '#6b7280' }} />
+              <Button
+                size="small"
+                type="text"
+                icon={<CheckOutlined />}
+                onClick={() => markAllAsRead(displayedEntries.map(e => e.id))}
+                title={t('article.markAllRead') || 'Mark all as read'}
+              />
+            </div>
           </div>
-        </div>
-        <div style={{ padding: '8px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 16, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text type="secondary" style={{ fontSize: 11 }}>{t('article.sort')}:</Text>
-            <Select size="small" value={sortKey} onChange={setSortKey} style={{ width: 80 }}>
-              <Select.Option value="time">{t('article.byTime')}</Select.Option>
-              <Select.Option value="score">{t('article.byScore')}</Select.Option>
-            </Select>
+          <div style={{ padding: '8px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 16, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>{t('article.sort')}:</Text>
+              <Select size="small" value={sortKey} onChange={setSortKey} style={{ width: 80 }}>
+                <Select.Option value="time">{t('article.byTime')}</Select.Option>
+                <Select.Option value="score">{t('article.byScore')}</Select.Option>
+              </Select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>{t('article.filter')}:</Text>
+              <Select size="small" value={filterKey} onChange={setFilterKey} style={{ width: 80 }}>
+                <Select.Option value="all">{t('article.all')}</Select.Option>
+                <Select.Option value="unread">{t('article.unread')}</Select.Option>
+              </Select>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text type="secondary" style={{ fontSize: 11 }}>{t('article.filter')}:</Text>
-            <Select size="small" value={filterKey} onChange={setFilterKey} style={{ width: 80 }}>
-              <Select.Option value="all">{t('article.all')}</Select.Option>
-              <Select.Option value="unread">{t('article.unread')}</Select.Option>
-            </Select>
-          </div>
-        </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-          {isLoadingEntries ? (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-          ) : displayedEntries.length > 0 ? (
-            displayedEntries.map(entry => {
-              const isRead = readEntryIds.has(entry.id)
-              const likeState = getLikeState(entry)
-              const favorited = isFavorited(entry)
-              const isImportant = (entry.total_score ?? 0) >= 0.5
-              const isSelected = selectedEntry?.id === entry.id
+          <div style={{ flex: 1, overflowY: 'auto', padding: 8, minHeight: 0 }}>
+            {isLoadingEntries ? (
+              <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+            ) : displayedEntries.length > 0 ? (
+              displayedEntries.map(entry => {
+                const isRead = readEntryIds.has(entry.id)
+                const likeState = getLikeState(entry)
+                const favorited = isFavorited(entry)
+                const isImportant = (entry.total_score ?? 0) >= 0.5
+                const isSelected = selectedEntry?.id === entry.id
 
-              return (
-                <div
-                  key={entry.id}
-                  onClick={() => setSelectedEntry(entry)}
-                  style={{
-                    padding: 12,
-                    borderRadius: 8,
-                    marginBottom: 4,
-                    cursor: 'pointer',
-                    background: isSelected ? '#fff' : 'transparent',
-                    boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                    borderLeft: isImportant ? '3px solid #f59e0b' : '3px solid transparent',
-                    opacity: isRead ? 0.6 : 1,
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        flexShrink: 0,
-                        background: (entry.total_score ?? 0) >= 0.7 ? '#dcfce7' : (entry.total_score ?? 0) >= 0.4 ? '#fef3c7' : '#f3f4f6',
-                        color: (entry.total_score ?? 0) >= 0.7 ? '#15803d' : (entry.total_score ?? 0) >= 0.4 ? '#b45309' : '#6b7280',
-                      }}
-                    >
-                      {isImportant && <StarOutlined style={{ fontSize: 10, marginRight: 2 }} />}
-                      {Math.round((entry.total_score ?? 0) * 100)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <Text
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => setSelectedEntry(entry)}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 4,
+                      cursor: 'pointer',
+                      background: isSelected ? '#fff' : 'transparent',
+                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      borderLeft: isImportant ? '3px solid #f59e0b' : '3px solid transparent',
+                      opacity: isRead ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div
                         style={{
-                          fontSize: 13,
-                          fontWeight: isRead ? 400 : 500,
-                          color: isRead ? '#6b7280' : '#1a1a1a',
-                          display: 'block',
-                          marginBottom: 4,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          flexShrink: 0,
+                          background: (entry.total_score ?? 0) >= 0.7 ? '#dcfce7' : (entry.total_score ?? 0) >= 0.4 ? '#fef3c7' : '#f3f4f6',
+                          color: (entry.total_score ?? 0) >= 0.7 ? '#15803d' : (entry.total_score ?? 0) >= 0.4 ? '#b45309' : '#6b7280',
                         }}
                       >
-                        {favorited && <StarFilled style={{ color: '#f59e0b', marginRight: 4 }} />}
-                        {likeState === 1 && <span>👍</span>}
-                        {likeState === -1 && <span>👎</span>}
-                        {entry.title}
-                      </Text>
-                      <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span>{entry.feed_name || ''}</span>
-                        <span>·</span>
-                        <span>{formatDate(entry.published_at)}</span>
-                        {!isRead && <Badge count="●" style={{ background: '#3b82f6', fontSize: 8, minWidth: 8, height: 8 }} />}
+                        {isImportant && <StarOutlined style={{ fontSize: 10, marginRight: 2 }} />}
+                        {Math.round((entry.total_score ?? 0) * 100)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: isRead ? 400 : 500,
+                            color: isRead ? '#6b7280' : '#1a1a1a',
+                            display: 'block',
+                            marginBottom: 4,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {favorited && <StarFilled style={{ color: '#f59e0b', marginRight: 4 }} />}
+                          {likeState === 1 && <span>👍</span>}
+                          {likeState === -1 && <span>👎</span>}
+                          {entry.title}
+                        </Text>
+                        <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>{entry.feed_name || ''}</span>
+                          <span>·</span>
+                          <span>{formatDate(entry.published_at)}</span>
+                          {!isRead && <Badge count="●" style={{ background: '#3b82f6', fontSize: 8, minWidth: 8, height: 8 }} />}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )
-            })
-          ) : (
-            <Empty description={t('dashboard.noArticles')} style={{ marginTop: 40 }} />
-          )}
+                )
+              })
+            ) : (
+              <Empty description={t('dashboard.noArticles')} style={{ marginTop: 40 }} />
+            )}
+          </div>
         </div>
       </Sider>
 
-      <Content style={{ background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Content style={{ background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         {selectedEntry ? (
           <>
             <div style={{ padding: 20, borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
@@ -387,7 +395,13 @@ export function ReaderView() {
               <p>请前往设置页面配置 LLM 提供者。</p>
             </Modal>
 
-            <div style={{ flex: 1, overflow: 'auto', padding: 24, lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: (entryContent as any)?.content || '' }} />
+            <div style={{ flex: 1, overflow: 'auto', padding: 24, lineHeight: 1.8 }}>
+              {isLoadingContent ? (
+                <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+              ) : (
+                <div dangerouslySetInnerHTML={{ __html: (entryContent as any)?.content || '' }} />
+              )}
+            </div>
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>

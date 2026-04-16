@@ -1,7 +1,7 @@
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import { Layout as AntLayout, Menu, Badge, Switch, Typography, Tag } from 'antd'
+import { Layout as AntLayout, Menu, Badge, Switch, Typography } from 'antd'
 import {
   DashboardOutlined,
   ReadOutlined,
@@ -10,6 +10,7 @@ import {
   StarOutlined,
   RobotOutlined,
   SettingOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { useFeeds } from '../hooks/useFeeds'
 import { useReader } from '../context/ReaderContext'
@@ -32,6 +33,34 @@ interface LLMStatus {
   }
 }
 
+// LLM health status types
+type LLMHealthStatus = 'healthy' | 'degraded' | 'offline' | 'unknown'
+
+function getLLMHealthStatus(llmStatus: LLMStatus | undefined): LLMHealthStatus {
+  if (!llmStatus) return 'unknown'
+  if (!llmStatus.available) return 'offline'
+  if (llmStatus.error) return 'degraded'
+  // Check if approaching token limit ( > 80% used)
+  if (llmStatus.usage && llmStatus.usage.limit > 0) {
+    const usagePercent = (llmStatus.usage.total_tokens / llmStatus.usage.limit) * 100
+    if (usagePercent > 80) return 'degraded'
+  }
+  return 'healthy'
+}
+
+function getLLMStatusColor(status: LLMHealthStatus): { bg: string; border: string; text: string; dot: string } {
+  switch (status) {
+    case 'healthy':
+      return { bg: '#f0fdf4', border: '#22c55e', text: '#166534', dot: '#22c55e' }
+    case 'degraded':
+      return { bg: '#fefce8', border: '#eab308', text: '#854d0e', dot: '#eab308' }
+    case 'offline':
+      return { bg: '#fef2f2', border: '#ef4444', text: '#991b1b', dot: '#ef4444' }
+    default:
+      return { bg: '#f9fafb', border: '#d1d5db', text: '#6b7280', dot: '#9ca3af' }
+  }
+}
+
 // Helper to get favicon URL from feed URL
 function getFaviconUrl(feedUrl: string): string {
   try {
@@ -49,6 +78,7 @@ const NAV_ITEMS = [
   { path: '/recent', labelKey: 'nav.recent', icon: <ClockCircleOutlined /> },
   { path: '/recommendations', labelKey: 'nav.recommendations', icon: <StarOutlined /> },
   { path: '/agent', labelKey: 'nav.agent', icon: <RobotOutlined /> },
+  { path: '/plugins', labelKey: 'nav.plugins', icon: <AppstoreOutlined /> },
   { path: '/settings', labelKey: 'nav.settings', icon: <SettingOutlined /> },
 ]
 
@@ -103,13 +133,37 @@ export function Layout() {
             <Text strong style={{ fontSize: 16 }}>{i18n.language === 'zh' ? '熵流' : 'EntroFeed'}</Text>
           </div>
           {llmStatus && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Tag color={llmStatus.available ? 'green' : 'red'} style={{ margin: 0, fontSize: 11 }}>
-                {llmStatus.available ? `${llmStatus.provider}` : 'LLM Offline'}
-              </Tag>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: `1px solid ${getLLMStatusColor(getLLMHealthStatus(llmStatus)).border}`,
+                backgroundColor: getLLMStatusColor(getLLMHealthStatus(llmStatus)).bg,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: getLLMStatusColor(getLLMHealthStatus(llmStatus)).dot,
+                  flexShrink: 0,
+                }}
+              />
+              <Text style={{ fontSize: 12, color: getLLMStatusColor(getLLMHealthStatus(llmStatus)).text, fontWeight: 500 }}>
+                {llmStatus.available ? `${llmStatus.provider}/${llmStatus.model}` : 'LLM Offline'}
+              </Text>
               {llmStatus.available && llmStatus.usage && (
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  📊 {llmStatus.usage.total_tokens.toLocaleString()} tokens
+                <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>
+                  {llmStatus.usage.total_tokens.toLocaleString()} tokens
+                </Text>
+              )}
+              {llmStatus.error && (
+                <Text type="danger" style={{ fontSize: 10, marginLeft: 4 }}>
+                  {llmStatus.error.substring(0, 20)}
                 </Text>
               )}
             </div>

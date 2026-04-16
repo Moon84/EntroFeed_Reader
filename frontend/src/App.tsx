@@ -13,6 +13,7 @@ import { HandlerConfig } from './pages/HandlerConfig'
 import { Onboarding } from './pages/Onboarding'
 import { About } from './pages/About'
 import { Agent } from './pages/Agent'
+import { PluginHealth } from './pages/PluginHealth'
 import { ReaderProvider } from './context/ReaderContext'
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/handlers/:type" element={<HandlerConfig />} />
             <Route path="/agent" element={<Agent />} />
+            <Route path="/plugins" element={<PluginHealth />} />
             <Route path="/about" element={<About />} />
           </Route>
         </Routes>

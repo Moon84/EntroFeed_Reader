@@ -110,9 +110,8 @@ export interface UserInterest {
 }
 
 export interface Handler {
-  type: string;
-  handler_type: 'llm' | 'notification' | 'content';
-  config?: Record<string, unknown>;
+  name: string;
+  type: 'llm' | 'notification' | 'content' | 'storage';
   configured: boolean;
 }
 
