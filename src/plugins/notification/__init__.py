@@ -6,7 +6,7 @@ from typing import ClassVar, List, Optional
 
 from src.handlers import NotificationHandler as OldNotificationHandler
 from src.kernel.registry import PluginBase, PluginRegistry
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 
 
 class NotificationPluginBase(PluginBase, OldNotificationHandler):
@@ -16,6 +16,11 @@ class NotificationPluginBase(PluginBase, OldNotificationHandler):
     """
 
     id: ClassVar[str] = "base_notification"
+
+    @classmethod
+    def get_plugin_type(cls) -> str:
+        """Return the plugin type string."""
+        return "notification"
 
     @property
     def destinations(self) -> List[str]:
@@ -39,7 +44,7 @@ class NotificationPluginBase(PluginBase, OldNotificationHandler):
 class NotificationPluginRegistry:
     """Registry for notification plugins."""
 
-    _handlers = {}
+    _handlers: dict = {}
 
     @classmethod
     def register(cls, handler_cls: type) -> None:
@@ -56,12 +61,10 @@ class NotificationPluginRegistry:
 
 
 # Import all notification plugins to trigger auto-registration
-from src.plugins.notification import slack, matrix, jira, ntfy, null
+from src.plugins.notification import slack, ntfy, null
 
 # Re-export handler classes for convenient import
 from src.plugins.notification.slack import SlackNotificationHandler
-from src.plugins.notification.matrix import MatrixNotificationHandler
-from src.plugins.notification.jira import JiraNotificationHandler
 from src.plugins.notification.ntfy import NtfyNotificationHandler
 from src.plugins.notification.null import NullNotificationHandler
 
@@ -70,8 +73,6 @@ __all__ = [
     "NotificationPluginBase",
     "NotificationPluginRegistry",
     "SlackNotificationHandler",
-    "MatrixNotificationHandler",
-    "JiraNotificationHandler",
     "NtfyNotificationHandler",
     "NullNotificationHandler",
 ]
