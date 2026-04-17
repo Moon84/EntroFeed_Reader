@@ -2,46 +2,44 @@
 """
 Interest-Based Recommender - Recommend content based on user interests.
 """
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
-from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 
-from src.ontology.types import UserInterest, ContentProfile
-from src.ontology.domain_hierarchy import (
+from src.services.ontology.types import UserInterest, ContentProfile, InterestTag, InterestCategory, TagSource
+from src.services.ontology.domain_hierarchy import (
     detect_domains_in_text,
     get_cross_domain_parents,
     calculate_cross_domain_score,
 )
-
-if TYPE_CHECKING:
-    from src.ontology.memory import OntologyMemory
 
 
 class InterestBasedRecommender:
     """
     Recommend content based on user's tracked interests.
 
-    Scores content by how well it matches:
-    - User's high-priority interests
-    - Recent reading patterns
-    - Explicitly added interests (highest weight)
-    - Cross-domain concepts (e.g., AI+Medical = MedicalAI)
+    Uses OntologyRegistry as the primary interface to access:
+    - ContentProfile (pre-computed tags and priority)
+    - UserInterest (user's tracked interests)
+
+    Falls back to raw entry processing only when no ContentProfile exists.
     """
 
-    def __init__(self, memory=None):
+    def __init__(self, registry=None):
         """
         Initialize interest-based recommender.
 
         Args:
-            memory: OntologyMemory instance (uses global if not provided)
+            registry: OntologyRegistry instance (uses global if not provided)
         """
-        self.memory = memory
+        self._registry_instance = registry
 
     @property
-    def _memory(self):
-        if self.memory is None:
-            from src.ontology import get_ontology_registry
-            self.memory = get_ontology_registry().memory
-        return self.memory
+    def _registry(self):
+        """Get OntologyRegistry facade (avoids direct memory access)."""
+        if self._registry_instance is None:
+            from src.services.ontology import get_ontology_registry
+            self._registry_instance = get_ontology_registry()
+        return self._registry_instance
 
     def recommend(
         self,
@@ -58,9 +56,9 @@ class InterestBasedRecommender:
         Returns:
             List of recommended entries with match scores
         """
-        # Get user interests
+        # Get user interests through registry
         try:
-            user_interests = self._memory.get_all_user_interests()
+            user_interests = self._registry.get_user_interests()
         except Exception:
             user_interests = []
 
@@ -74,20 +72,28 @@ class InterestBasedRecommender:
             reverse=True
         )
 
-        # Get recent entries directly from storage (not from content_profiles which may be empty)
+        # Get recent profiles from ontology (preferred) and entries (fallback)
         try:
             from src.storage.singleton import get_storage
             storage = get_storage()
 
-            # Calculate cutoff time
             cutoff_time = int(datetime.now().timestamp()) - (recent_hours * 3600)
-
-            # Get recent entries from storage
             recent_entries_data = storage.get_entries(after=cutoff_time)
         except Exception:
             recent_entries_data = []
 
-        # Score each entry
+        # Build a map of entry_id -> ContentProfile from registry
+        entry_profiles: Dict[str, ContentProfile] = {}
+        for entry_data in recent_entries_data:
+            entry = entry_data.get("entry")
+            if not entry:
+                continue
+            entry_id = entry_data.get("id") or entry.id
+            profile = self._registry.get_content_profile(entry_id)
+            if profile:
+                entry_profiles[entry_id] = profile
+
+        # Score entries - prefer ContentProfile when available
         scored_entries: List[tuple] = []
         for entry_data in recent_entries_data:
             entry = entry_data.get("entry")
@@ -95,28 +101,21 @@ class InterestBasedRecommender:
                 continue
 
             entry_id = entry_data.get("id") or entry.id
+            profile = entry_profiles.get(entry_id)
             content_text = f"{entry.title} {entry.preview or ''} {entry.content or ''}"
 
-            # Convert entry tags to InterestTag-like format for scoring
-            entry_tags = []
-            if entry.tags:
-                for t in entry.tags:
-                    if isinstance(t, dict):
-                        from src.ontology.types import InterestTag, InterestCategory, TagSource
-                        try:
-                            cat = InterestCategory(t.get("category", "other"))
-                        except ValueError:
-                            cat = InterestCategory.OTHER
-                        entry_tags.append(InterestTag(
-                            name=t.get("name", "").lower(),
-                            category=cat,
-                            confidence=t.get("confidence", 0.5),
-                            source=TagSource.INFERENCE
-                        ))
-
-            score = self._calculate_interest_score_from_entry(entry, entry_tags, sorted_interests, content_text)
-            if score > 0:
-                scored_entries.append((entry_id, entry, score))
+            if profile:
+                # Use pre-computed ContentProfile
+                score = self._calculate_interest_score(profile, sorted_interests, content_text)
+                if score > 0:
+                    scored_entries.append((entry_id, entry, score, profile))
+            else:
+                # Fallback: convert raw entry tags to InterestTag format
+                entry_tags = self._convert_entry_tags(entry)
+                if entry_tags or content_text:
+                    score = self._calculate_interest_score_from_entry(entry, entry_tags, sorted_interests, content_text)
+                    if score > 0:
+                        scored_entries.append((entry_id, entry, score, None))
 
         # Sort by score descending
         scored_entries.sort(key=lambda x: x[2], reverse=True)
@@ -125,12 +124,20 @@ class InterestBasedRecommender:
         recommendations = []
         seen_entries = set()
 
-        for entry_id, entry, score in scored_entries:
+        for entry_id, entry, score, profile in scored_entries:
             if entry_id in seen_entries:
                 continue
 
             seen_entries.add(entry_id)
             entry_info = self._get_entry_info(entry_id)
+
+            # Use profile tags if available, otherwise entry tags
+            if profile:
+                matched_interest = self._get_matched_interest(profile, sorted_interests)
+                cross_domain_tags = self._get_cross_domain_tags_from_profile(profile, content_text)
+            else:
+                matched_interest = self._get_matched_interest_from_entry(entry, sorted_interests)
+                cross_domain_tags = self._get_cross_domain_tags(content_text)
 
             recommendations.append({
                 "entry_id": entry_id,
@@ -139,8 +146,8 @@ class InterestBasedRecommender:
                 "url": entry_info.get("url", ""),
                 "feed_name": entry_info.get("feed_name", ""),
                 "published_at": entry_info.get("published_at", ""),
-                "matched_interest": self._get_matched_interest_from_entry(entry, sorted_interests),
-                "cross_domain_tags": self._get_cross_domain_tags(content_text),
+                "matched_interest": matched_interest,
+                "cross_domain_tags": cross_domain_tags,
                 "source": "interest",
             })
 
@@ -148,6 +155,24 @@ class InterestBasedRecommender:
                 break
 
         return recommendations
+
+    def _convert_entry_tags(self, entry) -> List[InterestTag]:
+        """Convert raw entry tags to InterestTag list."""
+        entry_tags = []
+        if entry.tags:
+            for t in entry.tags:
+                if isinstance(t, dict):
+                    try:
+                        cat = InterestCategory(t.get("category", "other"))
+                    except ValueError:
+                        cat = InterestCategory.OTHER
+                    entry_tags.append(InterestTag(
+                        name=t.get("name", "").lower(),
+                        category=cat,
+                        confidence=t.get("confidence", 0.5),
+                        source=TagSource.INFERENCE
+                    ))
+        return entry_tags
 
     def _calculate_interest_score(
         self,
@@ -277,6 +302,16 @@ class InterestBasedRecommender:
                     best_match = interest.tag.name
 
         return best_match
+
+    def _get_cross_domain_tags_from_profile(
+        self,
+        profile: ContentProfile,
+        content_text: str
+    ) -> List[str]:
+        """Get cross-domain tags from profile and content text."""
+        if not content_text:
+            return []
+        return self._get_cross_domain_tags(content_text)
 
     def _calculate_interest_score_from_entry(
         self,

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Ontology module for user interest evaluation and tagging."""
 
-from src.ontology.types import (
+from .types import (
     TagSource,
     InterestCategory,
     InterestTag,
@@ -10,22 +10,27 @@ from src.ontology.types import (
     OntologyNode,
     OntologyRelation,
 )
-from src.ontology.registry import OntologyRegistry, get_ontology_registry
-from src.ontology.tagging import TagGenerator, TagMatcher
-from src.ontology.evaluation import (
+from .registry import OntologyRegistry, get_ontology_registry
+from .tagging import TagGenerator, TagMatcher
+from .evaluation import (
     PriorityEvaluator,
     InterestUpdater,
     InterestInferrer,
 )
-from src.ontology.priority_scorer import (
+from .priority_scorer import (
     PriorityScorer,
     ArticleTagger,
+    GraphPropagationScorer,
     get_priority_scorer,
     get_article_tagger,
+    get_graph_propagation_scorer,
     score_and_tag_articles,
     get_recency_score,
     get_authority_score,
+    reset_article_tagger,
 )
+from .wikidata import WikidataResolver
+from .domain_graph import DomainGraph
 
 __all__ = [
     # Types
@@ -49,9 +54,15 @@ __all__ = [
     # Priority Scoring
     "PriorityScorer",
     "ArticleTagger",
+    "GraphPropagationScorer",
     "get_priority_scorer",
     "get_article_tagger",
+    "get_graph_propagation_scorer",
     "score_and_tag_articles",
     "get_recency_score",
     "get_authority_score",
+    "reset_article_tagger",
+    # Wikidata & Graph
+    "WikidataResolver",
+    "DomainGraph",
 ]

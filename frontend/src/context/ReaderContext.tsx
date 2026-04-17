@@ -22,6 +22,8 @@ interface ReaderState {
   // Per-feed stats calculated from loaded entries
   feedEntryStats: Record<string, FeedEntryStats>
   updateFeedStats: (feedId: string, entries: Array<{ id: string; total_score?: number }>) => void
+  // Update stats from external API source
+  setExternalFeedStats: (stats: Array<{ feed_id: string; total_count: number; important_count: number; unread_count: number }>) => void
   // Sync initial state from loaded entries
   syncStateFromEntries: (entries: Array<{ id: string; is_read?: boolean; liked?: number; is_favorite?: boolean }>) => void
 }
@@ -39,6 +41,7 @@ const ReaderContext = createContext<ReaderState>({
   toggleFavorite: () => {},
   feedEntryStats: {},
   updateFeedStats: () => {},
+  setExternalFeedStats: () => {},
   syncStateFromEntries: () => {},
 })
 
@@ -116,6 +119,22 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
     }))
   }, [readEntryIds])
 
+  const setExternalFeedStats = useCallback((stats: Array<{ feed_id: string; total_count: number; important_count: number; unread_count: number }>) => {
+    setFeedEntryStats(prev => {
+      const next = { ...prev }
+      stats.forEach(stat => {
+        const readCount = stat.total_count - stat.unread_count
+        next[stat.feed_id] = {
+          totalCount: stat.total_count,
+          unreadCount: stat.unread_count,
+          importantCount: stat.important_count,
+          readCount: readCount,
+        }
+      })
+      return next
+    })
+  }, [])
+
   const syncStateFromEntries = useCallback((entries: Array<{ id: string; is_read?: boolean; liked?: number; is_favorite?: boolean }>) => {
     const readIds = new Set<string>()
     const liked: Record<string, number> = {}
@@ -146,6 +165,7 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
       toggleFavorite,
       feedEntryStats,
       updateFeedStats,
+      setExternalFeedStats,
       syncStateFromEntries,
     }}>
       {children}

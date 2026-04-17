@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Card, Statistic, Button, Typography, Skeleton, Alert } from 'antd'
-import { UnorderedListOutlined, StarOutlined, SettingOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { UnorderedListOutlined, SettingOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useRecentEntries } from '../hooks/useEntries'
 import { useFeeds } from '../hooks/useFeeds'
-import { useInterestRecommendations } from '../hooks/useRecommendations'
 import { getLLMStatus } from '../client-api/entries'
+import { useReader } from '../context/ReaderContext'
 
 const { Title, Text } = Typography
 
@@ -28,15 +28,19 @@ export function Dashboard() {
   const { t } = useTranslation()
   const { data: entries, isLoading: entriesLoading } = useRecentEntries()
   const { data: feeds, isLoading: feedsLoading } = useFeeds()
-  const { data: recs } = useInterestRecommendations(5)
+  const { readEntryIds, syncStateFromEntries } = useReader()
   const [llmStatus, setLlmStatus] = useState<LLMStatus | null>(null)
+
+  useEffect(() => {
+    if (entries) syncStateFromEntries(entries)
+  }, [entries, syncStateFromEntries])
 
   useEffect(() => {
     getLLMStatus().then(setLlmStatus).catch(() => setLlmStatus(null))
   }, [])
 
   const recentEntries = entries?.slice(0, 5) ?? []
-  const unreadCount = entries?.length ?? 0
+  const unreadCount = entries?.filter(e => !readEntryIds.has(e.id)).length ?? 0
   const feedCount = feeds?.length ?? 0
 
   return (
@@ -61,17 +65,11 @@ export function Dashboard() {
         <Card size="small">
           <Statistic title={t('dashboard.feeds')} value={feedCount} />
         </Card>
-        <Card size="small">
-          <Statistic title={t('nav.recommendations')} value={recs?.length ?? 0} />
-        </Card>
       </div>
 
       <div style={{ marginBottom: 24, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Link to="/feeds">
           <Button type="primary" icon={<UnorderedListOutlined />}>{t('nav.feeds')}</Button>
-        </Link>
-        <Link to="/recommendations">
-          <Button icon={<StarOutlined />}>{t('nav.recommendations')}</Button>
         </Link>
         <Link to="/settings">
           <Button icon={<SettingOutlined />}>{t('nav.settings')}</Button>
@@ -95,7 +93,7 @@ export function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {recentEntries.map((entry) => (
               <Link key={entry.id} to={`/read/${entry.id}`} style={{ textDecoration: 'none' }}>
-                <Card size="small" hoverable style={{ borderRadius: 12 }}>
+                <Card size="small" hoverable style={{ borderRadius: 12, opacity: readEntryIds.has(entry.id) ? 0.6 : 1 }}>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div
                       style={{

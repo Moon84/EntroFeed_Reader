@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from readabilipy import simple_json_from_html_string
 
 from src.constants import BANNED_GLOBS
-from src.models import EntryContent, Feed, FeedEntry
+from src.models.feed import EntryContent, Feed, FeedEntry
 
 logger = getLogger("uvicorn.error")
 

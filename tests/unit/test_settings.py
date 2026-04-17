@@ -3,7 +3,7 @@ from enum import Enum
 import pytest
 
 from src.handlers import ContentRetrievalHandler, LLMHandler, NotificationHandler
-from src.impls import load_storage_config
+from src.kernel.registry import load_storage_config
 from src.settings import GlobalSettings
 
 

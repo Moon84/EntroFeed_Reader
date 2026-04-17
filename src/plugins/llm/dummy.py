@@ -6,7 +6,7 @@ from typing import ClassVar
 from pydantic import Field
 
 from src.handlers import LLMHandler
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
 

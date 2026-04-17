@@ -10,14 +10,14 @@ This module provides:
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-from src.ontology.types import (
+from .types import (
     InterestTag,
     UserInterest,
     ContentProfile,
     TagSource,
     InterestCategory,
 )
-from src.ontology.tagging import TagMatcher
+from .tagging import TagMatcher
 
 
 class PriorityEvaluator:
@@ -77,6 +77,12 @@ class InterestUpdater:
     READING_BOOST = 0.05     # 5% boost when accessed
     HIGH_PRIORITY_BOOST = 0.1  # 10% boost for high priority content
 
+    # Like/dislike boost/decay factors
+    LIKED_BOOST = 0.1        # +10% for liked
+    FAVORITED_BOOST = 0.15   # +15% for favorited
+    DISLIKED_DECAY = 0.2     # -20% for disliked
+    MIN_RELEVANCE = 0.1      # Floor for suppressed interests
+
     def __init__(self):
         pass
 
@@ -124,6 +130,87 @@ class InterestUpdater:
                     relevance_score=0.3 + (content_priority * 0.05)
                 )
                 updated[new_interest.id] = new_interest
+
+        return list(updated.values())
+
+    def update_interests_on_like(
+        self,
+        content_tags: List[InterestTag],
+        user_interests: List[UserInterest],
+        is_favorited: bool = False
+    ) -> List[UserInterest]:
+        """Update user interests after liking/favoriting content.
+
+        Args:
+            content_tags: Tags from the content liked
+            user_interests: Current user interests
+            is_favorited: True if this was a favorite (higher boost)
+
+        Returns:
+            Updated user interests
+        """
+        boost = self.FAVORITED_BOOST if is_favorited else self.LIKED_BOOST
+        updated = {i.id: i for i in user_interests}
+        now = datetime.now().isoformat()
+
+        for tag in content_tags:
+            existing = self._find_existing_interest(tag, list(updated.values()))
+
+            if existing:
+                # Boost existing interest
+                existing.relevance_score = min(
+                    1.0,
+                    existing.relevance_score + boost
+                )
+                existing.access_count += 1
+                existing.last_accessed = now
+            else:
+                # Create new inferred interest with medium confidence
+                new_interest = UserInterest(
+                    tag=InterestTag(
+                        name=tag.name,
+                        category=tag.category,
+                        confidence=0.5,
+                        source=TagSource.BEHAVIOR,  # Inferred from behavior
+                        synonyms=tag.synonyms,
+                    ),
+                    priority=3,  # Default medium priority
+                    access_count=1,
+                    last_accessed=now,
+                    relevance_score=0.5 + boost  # Start higher for liked
+                )
+                updated[new_interest.id] = new_interest
+
+        return list(updated.values())
+
+    def update_interests_on_dislike(
+        self,
+        content_tags: List[InterestTag],
+        user_interests: List[UserInterest]
+    ) -> List[UserInterest]:
+        """Update user interests after disliking content.
+
+        Args:
+            content_tags: Tags from the content disliked
+            user_interests: Current user interests
+
+        Returns:
+            Updated user interests
+        """
+        updated = {i.id: i for i in user_interests}
+
+        for tag in content_tags:
+            existing = self._find_existing_interest(tag, list(updated.values()))
+
+            if existing:
+                # Decay existing interest
+                existing.relevance_score = max(
+                    self.MIN_RELEVANCE,
+                    existing.relevance_score - self.DISLIKED_DECAY
+                )
+                # If score is very low, consider suppressing this interest
+                if existing.relevance_score <= self.MIN_RELEVANCE:
+                    existing.priority = max(0, existing.priority - 1)
 
         return list(updated.values())
 
@@ -186,11 +273,29 @@ class InterestUpdater:
         tag: InterestTag,
         user_interests: List[UserInterest]
     ) -> Optional[UserInterest]:
-        """Find existing interest matching the tag."""
+        """Find existing interest matching the tag.
+
+        Matching priority:
+        1. Exact name match (case-insensitive)
+        2. Same Wikidata QID (if both have QIDs)
+        3. Synonym match
+        """
         for interest in user_interests:
-            if (interest.tag.name.lower() == tag.name.lower() or
-                interest.tag.category == tag.category):
+            # Exact name match
+            if interest.tag.name.lower() == tag.name.lower():
                 return interest
+
+            # Wikidata QID match (standardized entity)
+            if (tag.wikidata_qid and interest.tag.wikidata_qid
+                and tag.wikidata_qid == interest.tag.wikidata_qid):
+                return interest
+
+            # Synonym match
+            if tag.name.lower() in [s.lower() for s in interest.tag.synonyms]:
+                return interest
+            if interest.tag.name.lower() in [s.lower() for s in tag.synonyms]:
+                return interest
+
         return None
 
 

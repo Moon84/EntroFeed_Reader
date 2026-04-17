@@ -12,19 +12,19 @@ import json
 import re
 from typing import Dict, List, Optional, Any, Callable
 
-from src.ontology.types import (
+from .types import (
     InterestTag,
     InterestCategory,
     TagSource,
     ContentProfile,
 )
-from src.ontology.domain_hierarchy import (
+from .domain_hierarchy import (
     detect_domains_in_text,
     get_domain_by_name,
     get_cross_domain_parents,
     calculate_cross_domain_score,
 )
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 
 
 class TagGenerator:
@@ -53,14 +53,20 @@ Content Body: {body[:2000]}
 Return ONLY valid JSON, no markdown formatting.
 """
 
-    def __init__(self, llm_summarizer: Callable[[Feed, FeedEntry, str], str] = None):
+    def __init__(
+        self,
+        llm_summarizer: Callable[[Feed, FeedEntry, str], str] = None,
+        wikidata_resolver: 'WikidataResolver' = None
+    ):
         """Initialize tag generator.
 
         Args:
             llm_summarizer: Optional LLM function for content analysis.
                            If not provided, uses rule-based extraction.
+            wikidata_resolver: Optional WikidataResolver for entity standardization.
         """
         self.llm_summarizer = llm_summarizer
+        self.wikidata_resolver = wikidata_resolver
 
     def extract_tags(self, entry: FeedEntry, feed: Feed, content: str = None) -> ContentProfile:
         """Extract tags and create content profile.
@@ -108,12 +114,12 @@ Return ONLY valid JSON, no markdown formatting.
                 except ValueError:
                     category = InterestCategory.OTHER
 
-                tags.append(InterestTag(
-                    name=tag_data.get("name", "").lower(),
-                    category=category,
-                    confidence=tag_data.get("confidence", 0.5),
-                    source=TagSource.INFERENCE
-                ))
+                tag_name = tag_data.get("name", "").lower()
+                confidence = tag_data.get("confidence", 0.5)
+
+                # Resolve via Wikidata if available
+                tag = self._resolve_tag_with_wikidata(tag_name, category, confidence)
+                tags.append(tag)
 
             return ContentProfile(
                 entry_id=entry.id,
@@ -153,48 +159,38 @@ Return ONLY valid JSON, no markdown formatting.
 
         for kw in tech_keywords:
             if kw in text:
-                detected_tags.append(InterestTag(
-                    name=kw,
-                    category=InterestCategory.TECHNOLOGY,
-                    confidence=0.6,
-                    source=TagSource.INFERENCE
-                ))
+                tag = self._resolve_tag_with_wikidata(
+                    kw, InterestCategory.TECHNOLOGY, 0.6
+                )
+                detected_tags.append(tag)
 
         for kw in medical_keywords:
             if kw in text:
-                detected_tags.append(InterestTag(
-                    name=kw,
-                    category=InterestCategory.MEDICAL,
-                    confidence=0.6,
-                    source=TagSource.INFERENCE
-                ))
+                tag = self._resolve_tag_with_wikidata(
+                    kw, InterestCategory.MEDICAL, 0.6
+                )
+                detected_tags.append(tag)
 
         for kw in finance_keywords:
             if kw in text:
-                detected_tags.append(InterestTag(
-                    name=kw,
-                    category=InterestCategory.FINANCE,
-                    confidence=0.6,
-                    source=TagSource.INFERENCE
-                ))
+                tag = self._resolve_tag_with_wikidata(
+                    kw, InterestCategory.FINANCE, 0.6
+                )
+                detected_tags.append(tag)
 
         for kw in science_keywords:
             if kw in text:
-                detected_tags.append(InterestTag(
-                    name=kw,
-                    category=InterestCategory.SCIENCE,
-                    confidence=0.6,
-                    source=TagSource.INFERENCE
-                ))
+                tag = self._resolve_tag_with_wikidata(
+                    kw, InterestCategory.SCIENCE, 0.6
+                )
+                detected_tags.append(tag)
 
         for kw in business_keywords:
             if kw in text:
-                detected_tags.append(InterestTag(
-                    name=kw,
-                    category=InterestCategory.BUSINESS,
-                    confidence=0.6,
-                    source=TagSource.INFERENCE
-                ))
+                tag = self._resolve_tag_with_wikidata(
+                    kw, InterestCategory.BUSINESS, 0.6
+                )
+                detected_tags.append(tag)
 
         # Extract entities (simple capitalized phrase detection)
         entities = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', f"{entry.title} {preview}")
@@ -221,6 +217,58 @@ Return ONLY valid JSON, no markdown formatting.
         if re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):
             return "ja"
         return "en"
+
+    def _resolve_tag_with_wikidata(
+        self,
+        tag_name: str,
+        category: InterestCategory,
+        confidence: float
+    ) -> InterestTag:
+        """Resolve tag name to Wikidata QID if possible.
+
+        Args:
+            tag_name: Tag name to resolve
+            category: Tag category
+            confidence: Confidence score
+
+        Returns:
+            InterestTag with Wikidata fields populated if found
+        """
+        if not self.wikidata_resolver or not tag_name:
+            return InterestTag(
+                name=tag_name,
+                category=category,
+                confidence=confidence,
+                source=TagSource.INFERENCE
+            )
+
+        # Try to resolve via Wikidata
+        result = self.wikidata_resolver.resolve(tag_name, language="en")
+
+        if result:
+            return InterestTag(
+                name=tag_name,
+                category=category,
+                confidence=confidence,
+                source=TagSource.INFERENCE,
+                wikidata_qid=result["qid"],
+                wikidata_label=result["label"],
+                wikidata_description=result.get("description", ""),
+                synonyms=result.get("aliases", [])
+            )
+        else:
+            # No Wikidata match, create custom entity ID
+            import uuid
+            custom_qid = f"entrofeed:{uuid.uuid4().hex[:8]}"
+            return InterestTag(
+                name=tag_name,
+                category=category,
+                confidence=confidence,
+                source=TagSource.INFERENCE,
+                wikidata_qid=custom_qid,
+                wikidata_label=tag_name,
+                wikidata_description=f"Custom entity: {tag_name}"
+            )
 
 
 class TagMatcher:

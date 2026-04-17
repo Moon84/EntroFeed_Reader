@@ -7,6 +7,6 @@ def get_storage():
     """Get or create the singleton storage handler instance."""
     global _storage_instance
     if _storage_instance is None:
-        from src.impls import load_storage_config
+        from src.kernel.registry import load_storage_config
         _storage_instance = load_storage_config()
     return _storage_instance

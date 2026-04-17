@@ -1,6 +1,6 @@
 import pytest
 
-from src.models import EntryContent, Feed, FeedEntry
+from src.models.feed import EntryContent, Feed, FeedEntry
 
 
 @pytest.mark.skip

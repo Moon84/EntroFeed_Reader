@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import List, Mapping, Optional, Type
+from typing import Dict, List, Mapping, Optional, Type
 
 from src.handlers import HandlerBase
-from src.models import *
+from src.kernel.registry import PluginRegistry
+from src.models.feed import EntryContent, Feed, FeedEntry
 from src.settings import GlobalSettings
 
 
@@ -13,8 +14,26 @@ class StorageHandler(ABC):
 
     logger = getLogger("uvicorn.error")
 
-    def reconfigure_handler(self, id: str, config: Mapping) -> Type[HandlerBase]:
-        return self.handler_map[id](**config)
+    def reconfigure_handler(self, id: str, config: Mapping) -> HandlerBase:
+        """Look up handler by ID across all types and instantiate with config."""
+        for plugin_type in ("llm", "notification", "content", "storage"):
+            if PluginRegistry.has_plugin(plugin_type, id):
+                return PluginRegistry.create(plugin_type, id, **config)
+        raise KeyError(f"No handler found for id: {id}")
+
+    def _get_handler_map(self) -> Dict[str, Type[HandlerBase]]:
+        """Build unified handler map from PluginRegistry (used by get_handlers)."""
+        handler_map: Dict[str, Type[HandlerBase]] = {}
+        for plugin_type in ("llm", "notification", "content", "storage"):
+            handler_map.update(PluginRegistry.list_plugins(plugin_type))
+        return handler_map
+
+    def _get_handler_type_for_id(self, handler_id: str) -> Optional[str]:
+        """Find the plugin type for a given handler ID by searching all types."""
+        for plugin_type in ("llm", "notification", "content", "storage"):
+            if PluginRegistry.has_plugin(plugin_type, handler_id):
+                return plugin_type
+        return None
 
     @abstractmethod
     def clear_active_feeds(self) -> None:
@@ -94,7 +113,7 @@ class StorageHandler(ABC):
 
     @abstractmethod
     def get_entries(
-        self, feed: Feed = None, after: int = 0
+        self, feed: Feed = None, after: int = 0, liked: int = 0, is_favorite: bool = False
     ) -> List[Mapping[str, FeedEntry]]:
         """
         Given a feed, retrieve the entries for that feed and return a list of
@@ -102,6 +121,9 @@ class StorageHandler(ABC):
         id of the feed for which the entry exists, and id = the entry ID. If no
         feed is specified return entries for all feeds. Optionally, only return
         entries after a certain epoch timestamp.
+
+        liked: filter by like status (0 = all, 1 = liked, -1 = disliked)
+        is_favorite: if True, only return favorited entries
         """
         pass
 

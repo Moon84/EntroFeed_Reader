@@ -5,8 +5,10 @@ Ontology Memory - Storage layer for user interests and content profiles.
 This module provides storage for:
 - User interests (SQLite)
 - Content profiles (SQLite)
-- Ontology graph (SQLite)
 - Vector embeddings (ChromaDB)
+
+Note: Graph propagation is handled by GraphPropagationScorer (in-memory, hardcoded DOMAIN_HIERARCHY).
+The SQLite-based graph system has been removed as redundant.
 """
 import os
 import sqlite3
@@ -17,12 +19,10 @@ from typing import Dict, List, Optional, Any
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
-from src.ontology.types import (
+from .types import (
     InterestTag,
     UserInterest,
     ContentProfile,
-    OntologyNode,
-    OntologyRelation,
     TagSource,
     InterestCategory,
 )
@@ -89,40 +89,48 @@ class OntologyMemory:
             )
         """)
 
-        # Ontology nodes table
+        # Ontology nodes table (Wikidata + custom entities)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ontology_nodes (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                node_type TEXT NOT NULL,
-                category TEXT DEFAULT '',
-                description TEXT DEFAULT '',
-                properties_json TEXT DEFAULT '{}',
-                relations_json TEXT DEFAULT '[]',
+                wikidata_qid TEXT UNIQUE,
+                wikidata_label TEXT,
+                wikidata_description TEXT,
+                layer INTEGER DEFAULT 2,
+                node_type TEXT DEFAULT 'concept',
+                category TEXT,
+                synonyms_json TEXT DEFAULT '[]',
+                parent_qids_json TEXT DEFAULT '[]',
+                instance_of_qids_json TEXT DEFAULT '[]',
                 confidence REAL DEFAULT 1.0,
-                created_at TEXT NOT NULL
+                last_used TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )
         """)
 
-        # Ontology relations table
+        # Ontology edges table (relations between nodes)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ontology_relations (
+            CREATE TABLE IF NOT EXISTS ontology_edges (
                 id TEXT PRIMARY KEY,
-                source_id TEXT NOT NULL,
-                target_id TEXT NOT NULL,
+                source_qid TEXT NOT NULL,
+                target_qid TEXT NOT NULL,
                 relation_type TEXT NOT NULL,
                 weight REAL DEFAULT 1.0,
-                properties_json TEXT DEFAULT '{}',
+                edge_source TEXT DEFAULT 'wikidata',
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (source_id) REFERENCES ontology_nodes(id),
-                FOREIGN KEY (target_id) REFERENCES ontology_nodes(id)
+                UNIQUE(source_qid, target_qid, relation_type)
             )
         """)
 
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_interests_tag ON user_interests(tag_name)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_content_profiles_entry ON content_profiles(entry_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ontology_nodes_name ON ontology_nodes(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ontology_nodes_qid ON ontology_nodes(wikidata_qid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ontology_nodes_layer ON ontology_nodes(layer)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ontology_edges_source ON ontology_edges(source_qid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ontology_edges_target ON ontology_edges(target_qid)")
 
         self.conn.commit()
 
@@ -322,72 +330,177 @@ class OntologyMemory:
         )
         return results
 
-    # ============ Ontology Nodes ============
+    # ============ Ontology Graph Storage ============
 
-    def save_ontology_node(self, node: OntologyNode) -> None:
+    def save_ontology_node(self, node: 'OntologyNode') -> None:
         """Save or update ontology node."""
         import json
         cursor = self.conn.cursor()
+        now = datetime.now().isoformat()
 
         cursor.execute("""
             INSERT OR REPLACE INTO ontology_nodes
-            (id, name, node_type, category, description, properties_json, relations_json, confidence, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, name, wikidata_qid, wikidata_label, wikidata_description, layer,
+             node_type, category, synonyms_json, parent_qids_json, instance_of_qids_json,
+             confidence, last_used, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             node.id,
             node.name,
+            node.wikidata_qid,
+            node.wikidata_label,
+            node.wikidata_description,
+            node.layer,
             node.node_type,
             node.category,
-            node.description,
-            json.dumps(node.properties),
-            json.dumps(node.relations),
+            json.dumps(node.synonyms),
+            json.dumps(node.parent_qids),
+            json.dumps(node.instance_of_qids),
             node.confidence,
-            node.created_at
+            now,
+            node.created_at,
+            now
         ))
         self.conn.commit()
 
-    def get_ontology_node(self, node_id: str) -> Optional[OntologyNode]:
-        """Get ontology node by ID."""
+    def get_ontology_node(self, qid: str) -> Optional['OntologyNode']:
+        """Get ontology node by QID."""
         import json
+        from .types import OntologyNode
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM ontology_nodes WHERE id = ?", (node_id,))
+        cursor.execute("SELECT * FROM ontology_nodes WHERE wikidata_qid = ?", (qid,))
         row = cursor.fetchone()
         if not row:
             return None
+
         return OntologyNode(
             id=row["id"],
             name=row["name"],
+            wikidata_qid=row["wikidata_qid"],
+            wikidata_label=row["wikidata_label"],
+            wikidata_description=row["wikidata_description"],
+            layer=row["layer"],
             node_type=row["node_type"],
             category=row["category"],
-            description=row["description"],
-            properties=json.loads(row["properties_json"]),
-            relations=json.loads(row["relations_json"]),
+            synonyms=json.loads(row["synonyms_json"]),
+            parent_qids=json.loads(row["parent_qids_json"]),
+            instance_of_qids=json.loads(row["instance_of_qids_json"]),
             confidence=row["confidence"],
-            created_at=row["created_at"]
+            created_at=row["created_at"],
+            last_used=row["last_used"]
         )
 
-    def search_ontology_nodes(self, query: str, limit: int = 20) -> List[OntologyNode]:
-        """Search ontology nodes by name."""
+    def get_all_ontology_nodes(self, layer: int = None) -> List['OntologyNode']:
+        """Get all ontology nodes, optionally filtered by layer."""
         import json
+        from .types import OntologyNode
         cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT * FROM ontology_nodes WHERE name LIKE ? LIMIT ?",
-            (f"%{query}%", limit)
-        )
-        return [
-            OntologyNode(
+
+        if layer is not None:
+            cursor.execute("SELECT * FROM ontology_nodes WHERE layer = ? ORDER BY name", (layer,))
+        else:
+            cursor.execute("SELECT * FROM ontology_nodes ORDER BY name")
+
+        nodes = []
+        for row in cursor.fetchall():
+            nodes.append(OntologyNode(
                 id=row["id"],
                 name=row["name"],
+                wikidata_qid=row["wikidata_qid"],
+                wikidata_label=row["wikidata_label"],
+                wikidata_description=row["wikidata_description"],
+                layer=row["layer"],
                 node_type=row["node_type"],
                 category=row["category"],
-                description=row["description"],
-                properties=json.loads(row["properties_json"]),
-                relations=json.loads(row["relations_json"]),
+                synonyms=json.loads(row["synonyms_json"]),
+                parent_qids=json.loads(row["parent_qids_json"]),
+                instance_of_qids=json.loads(row["instance_of_qids_json"]),
                 confidence=row["confidence"],
-                created_at=row["created_at"]
+                created_at=row["created_at"],
+                last_used=row["last_used"]
+            ))
+        return nodes
+
+    def save_ontology_edge(self, edge: 'OntologyRelation') -> None:
+        """Save or update ontology edge."""
+        cursor = self.conn.cursor()
+        now = datetime.now().isoformat()
+
+        cursor.execute("""
+            INSERT OR REPLACE INTO ontology_edges
+            (id, source_qid, target_qid, relation_type, weight, edge_source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            edge.id,
+            edge.source_id,
+            edge.target_id,
+            edge.relation_type,
+            edge.weight,
+            edge.properties.get("edge_source", "wikidata"),
+            now
+        ))
+        self.conn.commit()
+
+    def get_node_edges(self, qid: str, direction: str = "outgoing") -> List['OntologyRelation']:
+        """Get edges for a node.
+
+        Args:
+            qid: Node QID
+            direction: "outgoing", "incoming", or "both"
+        """
+        import json
+        from .types import OntologyRelation
+        cursor = self.conn.cursor()
+
+        if direction == "outgoing":
+            cursor.execute("SELECT * FROM ontology_edges WHERE source_qid = ?", (qid,))
+        elif direction == "incoming":
+            cursor.execute("SELECT * FROM ontology_edges WHERE target_qid = ?", (qid,))
+        else:  # both
+            cursor.execute(
+                "SELECT * FROM ontology_edges WHERE source_qid = ? OR target_qid = ?",
+                (qid, qid)
             )
-            for row in cursor.fetchall()
-        ]
+
+        edges = []
+        for row in cursor.fetchall():
+            edges.append(OntologyRelation(
+                id=row["id"],
+                source_id=row["source_qid"],
+                target_id=row["target_qid"],
+                relation_type=row["relation_type"],
+                weight=row["weight"],
+                properties={"edge_source": row["edge_source"]},
+                created_at=row["created_at"]
+            ))
+        return edges
+
+    def get_all_ontology_edges(self) -> List['OntologyRelation']:
+        """Get all ontology edges."""
+        from .types import OntologyRelation
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM ontology_edges")
+
+        edges = []
+        for row in cursor.fetchall():
+            edges.append(OntologyRelation(
+                id=row["id"],
+                source_id=row["source_qid"],
+                target_id=row["target_qid"],
+                relation_type=row["relation_type"],
+                weight=row["weight"],
+                properties={"edge_source": row["edge_source"]},
+                created_at=row["created_at"]
+            ))
+        return edges
+
+    def delete_ontology_node(self, qid: str) -> bool:
+        """Delete ontology node and its edges."""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM ontology_nodes WHERE wikidata_qid = ?", (qid,))
+        cursor.execute("DELETE FROM ontology_edges WHERE source_qid = ? OR target_qid = ?", (qid, qid))
+        self.conn.commit()
+        return cursor.rowcount > 0
 
     def close(self):
         """Close database connection."""

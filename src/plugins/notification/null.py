@@ -4,7 +4,7 @@
 from typing import ClassVar
 
 from src.handlers import NotificationHandler
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 from src.plugins.notification import NotificationPluginBase, NotificationPluginRegistry
 
 

@@ -12,14 +12,14 @@ from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime
 from enum import Enum
 
-from src.ontology.types import (
+from .types import (
     InterestTag,
     InterestCategory,
     TagSource,
     ContentProfile,
     UserInterest,
 )
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 
 
 class AnalysisPhase(str, Enum):

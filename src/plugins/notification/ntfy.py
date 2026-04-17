@@ -4,7 +4,7 @@
 from json import dumps
 from logging import getLogger
 from os import environ
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import requests
 from pydantic import Field
@@ -29,8 +29,7 @@ class NtfyNotificationHandler(NotificationPluginBase, NotificationHandler):
         description="Ntfy server URL (NTFY_ROOT_URL env var)",
     )
     topic: str = Field(
-        default_factory=lambda: environ.get("NTFY_TOPIC") or "",
-        description="Default ntfy topic name",
+        description="Ntfy topic name (NTFY_TOPIC env var) *",
     )
 
     async def send_notification(self, feed: Feed, entry: FeedEntry) -> None:

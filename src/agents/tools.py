@@ -3,10 +3,12 @@
 
 import json
 import re
+import urllib.request
+import urllib.parse
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from src.ontology import get_ontology_registry
+from src.services.ontology import get_ontology_registry
 
 
 # ============ RSS/Feed Tools ============
@@ -129,8 +131,8 @@ def get_user_interests(category: str = None) -> str:
     Returns:
         JSON string with user interests
     """
-    from src.ontology import get_ontology_registry
-    from src.ontology.types import InterestCategory
+    from src.services.ontology import get_ontology_registry
+    from src.services.ontology.types import InterestCategory
 
     registry = get_ontology_registry()
 
@@ -164,8 +166,8 @@ def add_user_interest(
     Returns:
         JSON string with result
     """
-    from src.ontology import get_ontology_registry
-    from src.ontology.types import InterestTag, InterestCategory, TagSource
+    from src.services.ontology import get_ontology_registry
+    from src.services.ontology.types import InterestTag, InterestCategory, TagSource
 
     registry = get_ontology_registry()
 
@@ -198,7 +200,7 @@ def remove_user_interest(interest_id: str) -> str:
     Returns:
         JSON string with result
     """
-    from src.ontology import get_ontology_registry
+    from src.services.ontology import get_ontology_registry
 
     registry = get_ontology_registry()
     success = registry.remove_interest(interest_id)
@@ -219,7 +221,7 @@ def get_high_priority_content(min_priority: int = 3, limit: int = 10) -> str:
     Returns:
         JSON string with high priority content
     """
-    from src.ontology import get_ontology_registry
+    from src.services.ontology import get_ontology_registry
 
     registry = get_ontology_registry()
     profiles = registry.get_content_by_priority(
@@ -244,7 +246,7 @@ def process_content_for_user(entry_id: str) -> str:
     """
     from src.backend import EntroFeedBackend
     from src.storage.singleton import get_storage
-    from src.ontology import get_ontology_registry
+    from src.services.ontology import get_ontology_registry
 
     storage = get_storage()
     backend = EntroFeedBackend(db=storage)
@@ -272,7 +274,7 @@ def process_content_for_user(entry_id: str) -> str:
         }, indent=2)
 
     # Process content
-    from src.models import FeedEntry, Feed
+    from src.models.feed import FeedEntry, Feed
 
     feed_entry = FeedEntry(**entry) if isinstance(entry, dict) else entry
     feed_obj = Feed(**feed) if isinstance(feed, dict) else feed
@@ -296,7 +298,7 @@ def get_daily_digest(date: str = None) -> str:
     Returns:
         JSON string with digest
     """
-    from src.ontology import get_ontology_registry
+    from src.services.ontology import get_ontology_registry
 
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
@@ -342,9 +344,82 @@ LANGUAGE_NAMES = {
     "ar": "Arabic",
 }
 
+LANG_MAP = {
+    "en": "en",
+    "zh": "zh-CN",
+    "ja": "ja",
+    "ko": "ko",
+    "fr": "fr",
+    "de": "de",
+    "es": "es",
+    "ru": "ru",
+    "ar": "ar",
+}
+
+
+def translate_with_my_memory(text: str, target_lang: str = "zh", source_lang: str = "en") -> str:
+    """Translate using MyMemory API (free, no API key required).
+    Handles longer text by chunking (500 chars per request).
+
+    Args:
+        text: Text to translate
+        target_lang: Target language code
+        source_lang: Source language code
+
+    Returns:
+        JSON string with translation result
+    """
+    try:
+        langpair = f"{LANG_MAP.get(source_lang, source_lang)}|{LANG_MAP.get(target_lang, target_lang)}"
+
+        # For text longer than 500 chars, translate in chunks
+        if len(text) <= 500:
+            encoded_text = urllib.parse.quote(text.encode('utf-8'))
+            url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={langpair}"
+            with urllib.request.urlopen(url, timeout=30) as response:
+                result = json.loads(response.read().decode('utf-8'))
+            if result.get('responseStatus') == 200:
+                translated = result['responseData']['translatedText']
+            else:
+                return json.dumps({
+                    "success": False,
+                    "error": f"MyMemory error: {result.get('responseDetails', 'Unknown error')}"
+                })
+        else:
+            # Translate in chunks and combine
+            chunks = []
+            chunk_size = 450  # Leave some margin
+            for i in range(0, len(text), chunk_size):
+                chunk = text[i:i+chunk_size]
+                encoded_text = urllib.parse.quote(chunk.encode('utf-8'))
+                url = f"https://api.mymemory.translated.net/get?q={encoded_text}&langpair={langpair}"
+                with urllib.request.urlopen(url, timeout=30) as response:
+                    result = json.loads(response.read().decode('utf-8'))
+                if result.get('responseStatus') == 200:
+                    chunks.append(result['responseData']['translatedText'])
+                else:
+                    return json.dumps({
+                        "success": False,
+                        "error": f"MyMemory error at chunk {i}: {result.get('responseDetails', 'Unknown error')}"
+                    })
+            translated = ''.join(chunks)
+
+        return json.dumps({
+            "success": True,
+            "original": {"text": text[:500] + "..." if len(text) > 500 else text, "language": source_lang},
+            "translation": {"text": translated, "language": target_lang},
+            "provider": "mymemory",
+            "usage": {"total_tokens": len(text), "requests": (len(text) // 500) + 1},
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": f"MyMemory fallback failed: {str(e)}"
+        })
+
 
 def translate_text(text: str, target_lang: str = "zh") -> str:
-    """Translate text using LLM.
+    """Translate text. Uses MyMemory first, falls back to LLM.
 
     Args:
         text: Text to translate
@@ -353,17 +428,33 @@ def translate_text(text: str, target_lang: str = "zh") -> str:
     Returns:
         JSON string with translation result
     """
-    from src.llm import create_llm_handler
-
     if not text or not text.strip():
         return json.dumps({
             "success": False,
             "error": "Empty text provided"
         }, indent=2)
 
+    # Detect source language (simple heuristic)
+    chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    source_lang = "zh" if chinese_chars / len(text) > 0.3 else "en"
+
+    # Try MyMemory first (fast, free)
+    result = translate_with_my_memory(text, target_lang, source_lang)
+    result_obj = json.loads(result)
+
+    if result_obj.get("success"):
+        return result
+
+    # Fallback to LLM if MyMemory fails
+    return translate_with_llm(text, target_lang, source_lang)
+
+
+def translate_with_llm(text: str, target_lang: str, source_lang: str = "en") -> str:
+    """Translate using LLM (DashScope or other provider)."""
+    from src.plugins.llm import create_llm_handler
+
     target_name = LANGUAGE_NAMES.get(target_lang, target_lang)
 
-    # Create LLM handler
     try:
         llm = create_llm_handler()
     except Exception as e:
@@ -372,10 +463,6 @@ def translate_text(text: str, target_lang: str = "zh") -> str:
             "error": f"Failed to create LLM handler: {str(e)}"
         }, indent=2)
 
-    # Detect source language (simple heuristic)
-    # Check if text contains mostly Chinese characters
-    chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
-    source_lang = "zh" if chinese_chars / len(text) > 0.3 else "en"
     source_name = LANGUAGE_NAMES.get(source_lang, source_lang)
 
     # Create translation prompt
@@ -414,7 +501,7 @@ Respond ONLY with the translation, nothing else. Preserve the formatting if poss
         return json.dumps({
             "success": False,
             "error": str(e)
-        }, indent=2, ensure_ascii=False)
+        }, indent=2)
 
 
 # Register tool functions for AgentScope

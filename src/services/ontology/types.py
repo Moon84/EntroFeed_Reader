@@ -46,6 +46,10 @@ class InterestTag(BaseModel):
     source: TagSource = TagSource.INFERENCE
     synonyms: List[str] = Field(default_factory=list)
     properties: Dict[str, Any] = Field(default_factory=dict)
+    # Wikidata standardization
+    wikidata_qid: Optional[str] = None  # e.g. "Q11660" or "entrofeed:xxx"
+    wikidata_label: Optional[str] = None
+    wikidata_description: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()
@@ -95,13 +99,24 @@ class OntologyNode(BaseModel):
     """Node in the ontology graph"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    node_type: str  # "concept", "entity", "topic"
+    node_type: str  # "concept", "entity", "topic", "domain"
     category: str = ""
     description: str = ""
+    synonyms: List[str] = Field(default_factory=list)  # 同义词列表
+    is_seed: bool = False  # 是否为用户兴趣种子节点
+    seed_priority: int = 0  # 种子节点优先级（0-5），只在 is_seed=True 时有效
     properties: Dict[str, Any] = Field(default_factory=dict)
     relations: List[Dict[str, Any]] = Field(default_factory=list)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    # Wikidata standardization
+    wikidata_qid: Optional[str] = None  # e.g. "Q11660" or "entrofeed:xxx"
+    wikidata_label: Optional[str] = None
+    wikidata_description: Optional[str] = None
+    layer: int = 2  # 2=Wikidata-aligned, 3=custom/LLM-expanded
+    parent_qids: List[str] = Field(default_factory=list)  # P279 subclass_of relations
+    instance_of_qids: List[str] = Field(default_factory=list)  # P31 instance_of relations
+    last_used: Optional[str] = None  # Last access timestamp for pruning
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()

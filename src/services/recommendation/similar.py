@@ -5,10 +5,10 @@ Similar Content Recommender - Vector-based similar content discovery.
 from typing import List, Dict, Any, Optional, Set, TYPE_CHECKING
 from datetime import datetime
 
-from src.models import FeedEntry
+from src.models.feed import FeedEntry
 
 if TYPE_CHECKING:
-    from src.ontology.memory import OntologyMemory
+    from src.services.ontology.memory import OntologyMemory
 
 
 class SimilarRecommender:
@@ -31,7 +31,7 @@ class SimilarRecommender:
     @property
     def _memory(self):
         if self.memory is None:
-            from src.ontology import get_ontology_registry
+            from src.services.ontology import get_ontology_registry
             self.memory = get_ontology_registry().memory
         return self.memory
 

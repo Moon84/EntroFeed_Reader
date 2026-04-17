@@ -226,7 +226,7 @@ def get_scheduler() -> SchedulerManager:
 async def poll_feeds_task() -> None:
     """Background task wrapper for RSS feed polling."""
     import asyncio
-    from src.rss import EntroFeedRSS
+    from src.services.feed.service import EntroFeedRSS
     from src.storage.singleton import get_storage
 
     logger.info("Scheduled: Checking feeds for updates")
@@ -244,7 +244,7 @@ async def poll_feeds_task() -> None:
 
 async def infer_interests_task() -> None:
     """Background task wrapper for interest inference."""
-    from src.ontology import get_ontology_registry
+    from src.services.ontology import get_ontology_registry
 
     logger.info("Scheduled: Inferring new interests")
 
@@ -270,6 +270,29 @@ async def daily_digest_task() -> None:
         logger.info(f"Daily digest generated: {parsed.get('count', 0)} entries")
     except Exception as e:
         logger.error(f"Scheduled daily digest failed: {e}")
+
+
+async def ontology_daily_batch_task() -> None:
+    """Background task wrapper for ontology daily batch update.
+
+    Processes all liked/disliked entries since last batch and updates ontology.
+    Also applies interest decay to stale interests.
+    """
+    from src.services.ontology import get_ontology_registry
+
+    logger.info("Scheduled: Ontology daily batch update")
+
+    try:
+        registry = get_ontology_registry()
+        result = registry.run_daily_batch_update()
+        logger.info(f"Ontology batch update: {result.get('processed', 0)} entries processed, "
+                    f"{result.get('entities_extracted', 0)} entities extracted")
+
+        # Apply interest decay for stale interests
+        registry.apply_decay(days=1)
+        logger.info("Ontology interest decay applied")
+    except Exception as e:
+        logger.error(f"Scheduled ontology batch update failed: {e}")
 
 
 # ============ Convenience Functions ============
@@ -307,6 +330,14 @@ def setup_daily_tasks() -> None:
         func=daily_digest_task,
         hour=8,
         minute=0,
+    )
+
+    # Ontology batch update at 3:30 AM daily
+    scheduler.add_cron_task(
+        task_id="ontology_batch",
+        func=ontology_daily_batch_task,
+        hour=3,
+        minute=30,
     )
 
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
@@ -7,12 +8,11 @@ import {
   ReadOutlined,
   UnorderedListOutlined,
   ClockCircleOutlined,
-  StarOutlined,
   RobotOutlined,
   SettingOutlined,
   AppstoreOutlined,
 } from '@ant-design/icons'
-import { useFeeds } from '../hooks/useFeeds'
+import { useFeeds, useFeedStats } from '../hooks/useFeeds'
 import { useReader } from '../context/ReaderContext'
 import { getLLMStatus } from '../client-api/entries'
 
@@ -76,7 +76,6 @@ const NAV_ITEMS = [
   { path: '/reader', labelKey: 'nav.reader', icon: <ReadOutlined /> },
   { path: '/feeds', labelKey: 'nav.feeds', icon: <UnorderedListOutlined /> },
   { path: '/recent', labelKey: 'nav.recent', icon: <ClockCircleOutlined /> },
-  { path: '/recommendations', labelKey: 'nav.recommendations', icon: <StarOutlined /> },
   { path: '/agent', labelKey: 'nav.agent', icon: <RobotOutlined /> },
   { path: '/plugins', labelKey: 'nav.plugins', icon: <AppstoreOutlined /> },
   { path: '/settings', labelKey: 'nav.settings', icon: <SettingOutlined /> },
@@ -87,12 +86,20 @@ export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { data: feeds } = useFeeds()
-  const { selectedFeedId, setSelectedFeedId, feedEntryStats } = useReader()
+  const { selectedFeedId, setSelectedFeedId, feedEntryStats, setExternalFeedStats } = useReader()
   const { data: llmStatus } = useQuery<LLMStatus>({
     queryKey: ['llm-status'],
     queryFn: getLLMStatus,
     refetchInterval: 60000, // Refresh every minute
   })
+  const { data: feedStats } = useFeedStats()
+
+  // Update external feed stats when they change
+  useEffect(() => {
+    if (feedStats && feedStats.length > 0) {
+      setExternalFeedStats(feedStats)
+    }
+  }, [feedStats, setExternalFeedStats])
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'zh' ? 'en' : 'zh'
@@ -275,8 +282,17 @@ export function Layout() {
       </Sider>
 
       <AntLayout>
-        <Content style={{ padding: '24px 32px', background: '#f7f8fa', overflow: 'auto' }}>
-          <Outlet />
+        <Content style={{
+          padding: '24px 32px',
+          background: '#f7f8fa',
+          height: 'calc(100vh - 56px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <Outlet />
+          </div>
         </Content>
       </AntLayout>
     </AntLayout>

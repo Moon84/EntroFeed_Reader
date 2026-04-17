@@ -10,7 +10,7 @@ install-ci:
 
 .PHONY: run
 run:
-	.venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
+	ENTROFEED_STORAGE_HANDLER=sqlite .venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: run-ci
 run-ci:
@@ -22,7 +22,7 @@ dev-frontend:
 
 .PHONY: dev-backend
 dev-backend:
-	.venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
+	ENTROFEED_STORAGE_HANDLER=sqlite .venv/bin/uvicorn src.app:app --reload --log-level debug --port 8001
 
 .PHONY: dev
 dev:

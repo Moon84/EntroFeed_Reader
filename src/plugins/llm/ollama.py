@@ -7,7 +7,7 @@ from ollama import ChatResponse, Client, Message, Options
 from pydantic import Field
 
 from src.handlers import LLMHandler
-from src.models import Feed, FeedEntry
+from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
 
@@ -20,6 +20,19 @@ class OllamaLLMHandler(ModelWrapperBase, LLMHandler):
     options: Mapping[str, Any] = Field(default_factory=lambda: {"temperature": 0.2})
 
     id: ClassVar[str] = "ollama"
+    required_env: ClassVar[List[str]] = []  # Ollama is local, no API key needed
+
+    @classmethod
+    def _check_ollama_running(cls) -> bool:
+        """Check if Ollama server is running."""
+        import requests
+        try:
+            resp = requests.get("http://localhost:11434/api/tags", timeout=3)
+            return resp.status_code == 200
+        except requests.RequestException:
+            return False
+
+    _check_fn: ClassVar = _check_ollama_running
 
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         """Make chat completion call to Ollama."""

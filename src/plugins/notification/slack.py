@@ -23,9 +23,8 @@ class SlackNotificationHandler(NotificationPluginBase, NotificationHandler):
 
     id: ClassVar[str] = "slack"
     required_env: ClassVar[list] = ["SLACK_API_TOKEN"]
-    token: Optional[str] = Field(
-        default_factory=lambda: environ.get("SLACK_API_TOKEN") or "",
-        description="Slack API token (SLACK_API_TOKEN env var)",
+    token: str = Field(
+        description="Slack API token (SLACK_API_TOKEN env var) *",
     )
     channel_name: str = Field(
         default="",

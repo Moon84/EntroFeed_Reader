@@ -11,6 +11,11 @@ class StoragePluginBase(PluginBase):
 
     id: ClassVar[str] = "base_storage"
 
+    @classmethod
+    def get_plugin_type(cls) -> str:
+        """Return the plugin type string."""
+        return "storage"
+
 
 class StoragePluginRegistry:
     """Registry for storage plugins."""
@@ -31,11 +36,21 @@ class StoragePluginRegistry:
         return cls._handlers.get(handler_id)
 
 
-# Import all storage plugins to trigger auto-registration
-from src.plugins.storage import tinydb, sqlite_storage, lmdb, hybrid
+# Import SQLite storage handler and register it
+from src.storage.sqlite_storage import SQLiteStorageHandler
+
+SQLiteStorageHandler.id = "sqlite"
+
+# Register storage handler with the plugin registry
+StoragePluginRegistry.register(SQLiteStorageHandler)
+
+
+# Re-export StorageHandler for backward compatibility
+from src.plugins.storage.handler import StorageHandler
 
 
 __all__ = [
     "StoragePluginBase",
     "StoragePluginRegistry",
+    "StorageHandler",
 ]

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { FeedEntry } from '../types'
 import { Card, Typography, Tag } from 'antd'
+import { useReader } from '../context/ReaderContext'
 
 const { Text } = Typography
 
@@ -9,6 +10,8 @@ interface EntryCardProps {
 }
 
 export function EntryCard({ entry }: EntryCardProps) {
+  const { readEntryIds } = useReader()
+  const isRead = readEntryIds.has(entry.id)
   const score = entry.total_score ?? 0
   const matchedInterests = entry.matched_interests ?? []
 
@@ -32,7 +35,7 @@ export function EntryCard({ entry }: EntryCardProps) {
 
   return (
     <Link to={`/read/${entry.id}`} style={{ textDecoration: 'none' }}>
-      <Card size="small" hoverable style={{ borderRadius: 12 }}>
+      <Card size="small" hoverable style={{ borderRadius: 12, opacity: isRead ? 0.6 : 1 }}>
         <div style={{ display: 'flex', gap: 12 }}>
           <div
             style={{

@@ -1,184 +1,314 @@
-# EntroFeed - Intelligent Feed Reader
+<div align="center">
 
-> 中文：[切换到中文](README_zh.md)
+# EntroFeed
 
-![EntroFeed Logo](src/assets/EntroFeed_logo_w_name.png)
+### Intelligent Feed Reader powered by AI
 
-EntroFeed (熵流) is an open-source, AI-powered RSS reader that leverages Entropy (information theory) and Ontology (knowledge structures) with Large Language Models to understand your professional domains and reading preferences. It helps you build an effective information moat through decentralized RSS feeds.
+[![GitHub Stars](https://img.shields.io/github/stars/Moon84/EntroFeed_Reader?style=social)](https://github.com/Moon84/EntroFeed_Reader/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/Moon84/EntroFeed_Reader?style=social)](https://github.com/Moon84/EntroFeed_Reader/network/members)
+[![License](https://img.shields.io/github/license/Moon84/EntroFeed_Reader?color=green)](https://github.com/Moon84/EntroFeed_Reader/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/react-18.x-61dafb.svg)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/fastapi-0.109+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
 
-## Features
+![Logo](src/assets/EntroFeed_logo_w_name.png)
+
+> **English** | [中文](README_zh.md)
+
+</div>
+
+---
+
+## 📖 Overview
+
+**EntroFeed (熵流)** is an open-source, AI-powered RSS reader that leverages **Entropy** (information theory) and **Ontology** (knowledge structures) with Large Language Models to understand your professional domains and reading preferences. It helps you build an effective information moat through decentralized RSS feeds.
+
+## ✨ Features
 
 ### Core Functionality
-- **Personalized Subscription**: RSS/Feed aggregation with automatic content fetching; supports RSS and RSShub feeds
-- **Multi-dimensional Scoring**: Ontology-based article evaluation (recency, authority, relevance, impact) to improve effective information acquisition
-- **Continuous Evolution**: Continuously refine evaluation criteria based on your reading habits and event correlations
-- **Multi-language Support (i18n)**: Currently supports Chinese and English
 
-### Extensible Architecture
-EntroFeed supports modular handlers:
-1. **Large Language Models** - Ollama, OpenAI, DashScope - for summarization and content analysis
-2. **Content Retrieval** - requests or Playwright for fetching article content
-3. **Storage** - SQLite + ChromaDB vector store (production), or file-based storage
-4. **Notifications (Coming Soon)** - Matrix, Slack, Jira, ntfy - for new article alerts
+| Feature | Description |
+|---------|-------------|
+| 🔗 **Personalized Subscription** | RSS/Feed aggregation with automatic content fetching; supports RSS and RSShub feeds |
+| 📊 **Multi-dimensional Scoring** | Ontology-based article evaluation (recency, authority, relevance, impact) |
+| 🔄 **Continuous Evolution** | Refine evaluation criteria based on your reading habits and event correlations |
+| 🌍 **Multi-language Support** | Full i18n support for Chinese and English |
 
-### User-Friendly Interface
-- Clean, modern UI built with React and Tailwind CSS
-- Responsive design with AntDesign components
+### AI Assistant
 
-## Quick Start
+- Built-in AI chat powered by **AntDesign X**
+- Summarize, translate, and discuss articles with context
+- Attach articles to conversations for deep analysis
+- Multi-provider support: OpenAI, Ollama, DashScope
 
-### Development Mode
+### Extensible Plugin Architecture
 
-**Prerequisites**: Node.js 18+, Python 3.11+, uv (Python package manager)
+| Plugin Type | Options |
+|-------------|---------|
+| **LLM Providers** | OpenAI, Ollama, DashScope |
+| **Content Retrieval** | requests, Playwright, RSShub |
+| **Storage** | SQLite + ChromaDB vector store |
+| **Notifications** | Slack, Ntfy |
+
+### User Interface
+
+- Clean, modern UI built with **React** and **AntDesign**
+- Responsive design with fixed-height layouts
+- Dark/Light theme support
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Node.js | 18+ |
+| Python | 3.11+ |
+| uv | Latest |
+| Docker | 20.10+ (optional) |
+
+### Docker Compose (Recommended)
 
 ```bash
-# Terminal 1: Start backend (FastAPI on port 8001)
-make dev:backend
-
-# Terminal 2: Start frontend (Vite on port 5173)
-make dev:frontend
-
-# Or install all dependencies at once
-make install
-make dev
-```
-
-Visit `http://localhost:5173` to access the application.
-
-### Using Docker Compose
-
-```bash
+# Clone the repository
 git clone https://github.com/Moon84/EntroFeed_Reader.git
-cd entrofeed
+cd EntroFeed_Reader
+
+# Start with default configuration
+docker compose up
+
+# Or configure environment variables first
+export DEFAULT_LLM_PROVIDER=dashscope
+export DASHSCOPE_API_KEY=your_api_key
 docker compose up
 ```
 
-Visit `http://localhost:8000` to access the application.
+> **Access**: Open [http://localhost:8000](http://localhost:8000) in your browser.
 
-## Project Structure
+### Development Mode
+
+```bash
+# Install dependencies
+make install
+
+# Terminal 1: Start backend (FastAPI on port 8001)
+make dev-backend
+
+# Terminal 2: Start frontend (Vite on port 5173)
+make dev-frontend
+```
+
+> **Access**: Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+#### LLM Providers
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEFAULT_LLM_PROVIDER` | Provider: `openai`, `ollama`, `dashscope` | `dashscope` |
+| `DASHSCOPE_API_KEY` | DashScope API key | - |
+| `DASHSCOPE_MODEL` | DashScope model | `qwen-plus` |
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434/v1` |
+| `OLLAMA_MODEL` | Ollama model | `llama3` |
+
+#### Notifications
+
+| Variable | Description |
+|----------|-------------|
+| `SLACK_API_TOKEN` | Slack bot token |
+| `NTFY_BASE_URL` | Ntfy server URL |
+| `NTFY_TOPIC` | Ntfy topic name |
+
+#### Storage & Feeds
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENTROFEED_STORAGE_HANDLER` | Storage handler type | `sqlite` |
+| `DATA_DIR` | Data directory path | `./data` |
+| `CONFIG_DIR` | Config directory path | `./configs` |
+| `REFRESH_INTERVAL` | Feed refresh interval (minutes) | `5` |
+| `RECENT_HOURS` | Hours for "recent" entries | `36` |
+
+### UI Configuration
+
+Handlers can also be configured through the web UI at **Settings → Handlers**.
+
+| Handler | Required Fields |
+|---------|----------------|
+| **OpenAI** | `api_key` |
+| **Ollama** | `base_url`, `model` |
+| **DashScope** | `api_key`, `model` |
+| **Slack** | `token` |
+| **Ntfy** | `topic` |
+
+## 🏗️ Project Structure
 
 ```
 entrofeed/
-├── src/                    # Python backend (FastAPI)
-│   ├── app.py              # Main application & routes
-│   ├── backend.py          # Business logic layer
-│   ├── static/              # Static assets (icons, CSS)
-│   ├── assets/             # Images (logos)
-│   ├── agents/             # AI agent & skills
-│   ├── content/            # Content retrieval (RSS, Playwright)
-│   ├── llm/                # LLM interfaces
-│   ├── ontology/           # Knowledge base & tagging
-│   ├── recommender/        # Recommendation engine
-│   └── storage/            # Data persistence
-├── frontend/               # React frontend (Vite)
-│   └── src/                # React source code
-│       ├── api/            # API client hooks
-│       ├── components/    # React components
-│       ├── pages/          # Page components
-│       └── hooks/          # Custom React hooks
-├── templates/              # Jinja2 templates (legacy)
-├── configs/                # Configuration files
-│   ├── feeds.yml           # Default RSS feeds
-│   ├── handlers.yml.example # Handler config template
-│   └── digital_medical_feeds.opml
-└── data/                   # Runtime data (gitignored)
-    ├── db.json             # SQLite database
-    ├── chroma/             # Vector database
-    └── ontology.db         # Knowledge base
+├── src/                          # Python backend (FastAPI)
+│   ├── app.py                    # Main application & routes
+│   ├── backend.py                # Business logic layer
+│   ├── handlers.py               # Handler base classes
+│   ├── mcp.py                    # MCP server implementation
+│   ├── scheduler.py              # Feed refresh scheduler
+│   ├── metrics.py                # Prometheus metrics
+│   ├── plugins/                  # Plugin implementations
+│   │   ├── llm/                  # LLM provider plugins
+│   │   ├── storage/              # Storage handler plugins
+│   │   ├── notification/         # Notification plugins
+│   │   └── content/              # Content retrieval plugins
+│   ├── services/                 # Business services
+│   │   ├── feed/                 # Feed aggregation
+│   │   ├── ontology/             # Knowledge base & tagging
+│   │   └── recommendation/       # Recommendation engine
+│   └── storage/                  # Storage implementations
+├── frontend/                     # React frontend (Vite)
+│   └── src/
+│       ├── components/           # React components
+│       ├── pages/                # Page components
+│       ├── hooks/                # Custom React hooks
+│       ├── client-api/           # API client functions
+│       └── context/              # React context providers
+├── configs/                      # Configuration files
+│   ├── feeds.yml                 # Default RSS feeds
+│   ├── handlers.yml              # Handler configurations
+│   └── user.md                   # User profile/interests
+├── tests/                        # Test suite
+│   ├── unit/                     # Unit tests
+│   └── e2e/                      # End-to-end tests
+├── docker-compose.yml             # Docker composition
+├── Dockerfile                     # Multi-stage Docker build
+└── Makefile                      # Development commands
 ```
 
-## First-Time Setup
+## 🛠️ Development
 
-### LLM Configuration
-
-Configure LLM, notification, and content retrieval handlers via YAML files in `configs/`.
-
-## CLI Usage
+### Available Commands
 
 ```bash
-# Backup and restore
-entrofeed backup
-entrofeed restore backup_file.json
+make install          # Install all dependencies
+make run              # Run backend with uvicorn
+make dev-frontend     # Start Vite dev server
+make dev-backend      # Start backend with auto-reload
+make build            # Build Docker images
+make docker-up        # Start Docker containers
+make docker-down      # Stop Docker containers
+make unit-test        # Run pytest
+make clean            # Clean data directory
+```
 
-# OPML import/export
-entrofeed export-opml
-entrofeed import-opml feeds.opml
+### Running Tests
 
-# Load configurations
-entrofeed load-settings
-entrofeed load-handlers
-entrofeed load-feeds
+```bash
+# Unit tests
+make unit-test
 
-# Check for new articles
-entrofeed check-feeds
+# Or manually
+pytest -vvv -cov
 
-# Start MCP server for external AI integration
+# E2E tests (requires running backend)
+cd frontend && npx playwright test
+```
+
+## 📡 API Reference
+
+### Utility Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/util/list-feeds` | GET | List all configured feeds |
+| `/util/feed-stats` | GET | Get statistics per feed |
+| `/util/list-feed-entries` | GET | List entries (supports filtering) |
+| `/util/list-handlers` | GET | List configured handlers |
+
+### Feed Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/refresh_feed/{id}` | POST | Refresh a specific feed |
+| `/api/delete_feed/{id}` | POST | Delete a feed |
+| `/api/update_feed/` | POST | Create/update feed |
+| `/api/import_opml/` | POST | Import OPML file |
+| `/api/export_opml/` | GET | Export feeds as OPML |
+
+### Settings
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/about` | GET | Get settings & app info |
+| `/api/update_settings/` | POST | Update settings |
+| `/api/backup/` | GET | Download database backup |
+| `/api/restore/` | POST | Restore from backup |
+
+### AI & Agent
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/agent/chat` | POST | Send message to AI assistant |
+| `/api/agent/sessions` | GET/POST | List/create chat sessions |
+| `/api/agent/tools` | GET | List available agent tools |
+| `/api/translate` | POST | Translate text |
+| `/api/llm/status` | GET | Get LLM provider status |
+| `/api/llm/usage` | GET | Get token usage stats |
+
+### Search & Recommendations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/search` | GET | Search entries |
+| `/api/recommendations/interest` | GET | Interest-based recommendations |
+| `/api/recommendations/trending` | GET | Trending entries |
+| `/api/recommendations/similar/{id}` | GET | Similar entries |
+
+## 🔌 MCP Server
+
+EntroFeed provides a **Model Context Protocol (MCP)** server for external AI integration.
+
+```bash
+# Start MCP server
 entrofeed mcp --port 8765
-```
 
-## MCP Server (External AI Integration)
-
-EntroFeed provides a **Model Context Protocol (MCP)** server that exposes its tools to external AI systems. This allows AI assistants to query your feed data, get recommendations, and manage interests.
-
-### Starting the MCP Server
-
-```bash
-# TCP mode (default) - AI clients connect via TCP
-entrofeed mcp --port 8765 --host 127.0.0.1
-
-# Stdio mode - for subprocess-based AI integration
+# Or in stdio mode
 entrofeed mcp --stdio
 ```
 
-### Available MCP Tools
+## 🤝 Contributing
 
-| Tool | Description |
-|------|-------------|
-| `list_feeds` | List all configured RSS feeds |
-| `get_feed_entries` | Get entries from a specific feed or recent entries |
-| `get_entry_content` | Get full content of a feed entry |
-| `search_entries` | Search entries by query |
-| `get_recommendations` | Get content recommendations (interest/trending/similar) |
-| `get_user_interests` | Get user interests |
-| `add_user_interest` | Add a new user interest |
-| `remove_user_interest` | Remove a user interest |
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-#### MCP Usage Examples: Claude Desktop Integration
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Add to your Claude Desktop configuration (`~/.claude/desktop-config.json`):
+## 📄 License
 
-```json
-{
-  "mcpServers": {
-    "entrofeed": {
-      "command": "entrofeed",
-      "args": ["mcp", "--stdio"]
-    }
-  }
-}
-```
+This project is licensed under the **AGPL-3.0 License** - see the [LICENSE](LICENSE) file for details.
 
-Then you can ask Claude:
-- "What are my latest articles about AI?"
-- "Show me trending content in my feed"
-- "Add machine learning to my interests"
-- "Find articles similar to [article title]"
+## 🙏 Acknowledgments
 
-### Security Note
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [React](https://react.dev/) - UI library
+- [AntDesign](https://ant.design/) - Design system
+- [ChromaDB](https://www.trychroma.com/) - Vector database
+- All our contributors and users
 
-The TCP MCP server binds to `127.0.0.1` by default. For production deployments, consider:
-- Using `--stdio` mode with a process manager
-- Adding authentication to the connection
-- Using a reverse proxy with TLS
+## 📬 Contact
 
-## License
+- **Author**: Yinlei Zhang
+- **Email**: wuyuezhang1984@gmail.com
+- **Issues**: [GitHub Issues](https://github.com/Moon84/EntroFeed_Reader/issues)
 
-AGPL 3.0 License
+---
 
-## Links
+<div align="center">
 
-- Contact Email: wuyuezhang1984@gmail.com
-- Location: Shanghai, Hongkou District
-- Documentation: [docs/](docs/)
-- Docker Deployment Guide: [docs/docker.zh.md](docs/docker.zh.md)
-- Issue Tracker: [GitHub Issues](https://github.com/Moon84/EntroFeed_Reader/issues)
+*If you find EntroFeed helpful, please give us a ⭐ on GitHub!*
+
+</div>

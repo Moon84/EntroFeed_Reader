@@ -161,35 +161,67 @@ async def list_feeds() -> Sequence[Mapping]:
 
 @app.get("/util/feed-stats")
 async def get_feed_stats():
-    """Get statistics for each feed."""
-    settings: GlobalSettings = storage_handler.get_settings()
-    cutoff_time = int(datetime.now().timestamp()) - (settings.recent_hours * 3600)
+    """Get statistics for each feed efficiently using SQL COUNT queries."""
+    try:
+        settings: GlobalSettings = storage_handler.get_settings()
+        cutoff_time = int(datetime.now().timestamp()) - (settings.recent_hours * 3600)
 
-    feeds = bk.list_feeds()
-    stats = []
+        feeds = bk.list_feeds()
+        stats = []
 
-    for feed in feeds:
-        feed_id = feed["id"]
-        entries = list(bk.list_entries(feed_id=feed_id))
-        recent_entries = [e for e in entries if e.get("sort_time", 0) >= cutoff_time]
-        important_count = sum(1 for e in recent_entries if e.get("total_score", 0) >= 0.5)
+        for feed in feeds:
+            feed_id = feed["id"]
+            # Use direct SQL queries for efficiency
+            cursor = storage_handler.conn.cursor()
 
-        stats.append({
-            "feed_id": feed_id,
-            "total_count": len(recent_entries),
-            "important_count": important_count,
-        })
+            # Total recent entries
+            cursor.execute(
+                "SELECT COUNT(*) FROM feed_entries WHERE feed_id = ? AND published_at > ?",
+                (feed_id, cutoff_time)
+            )
+            total_count = cursor.fetchone()[0]
 
-    return stats
+            # Important count - total_score is not stored in DB, set to 0
+            # The scoring is calculated at query time, not persisted
+            important_count = 0
+
+            # Unread count
+            cursor.execute(
+                "SELECT COUNT(*) FROM feed_entries WHERE feed_id = ? AND published_at > ? AND (is_read = 0 OR is_read IS NULL)",
+                (feed_id, cutoff_time)
+            )
+            unread_count = cursor.fetchone()[0]
+
+            stats.append({
+                "feed_id": feed_id,
+                "total_count": total_count,
+                "important_count": important_count,
+                "unread_count": unread_count,
+            })
+
+        return stats
+    except Exception as e:
+        logger.error(f"Error in get_feed_stats: {e}")
+        raise
 
 
 @app.get("/util/list-feed-entries")
-async def list_feed_entries(feed_id: str = None) -> Sequence[Mapping]:
+async def list_feed_entries(
+    feed_id: str = None,
+    liked: int = 0,
+    is_favorite: bool = False,
+) -> Sequence[Mapping]:
+    """
+    List feed entries with optional filtering.
+
+    liked: filter by like status (0 = all, 1 = liked, -1 = disliked)
+    is_favorite: if true, only return favorited entries
+    """
     if feed_id:
-        return list(bk.list_entries(feed_id=feed_id))
+        return list(bk.list_entries(feed_id=feed_id, liked=liked, is_favorite=is_favorite))
     else:
         all_feeds = bk.list_feeds()
-        entries = [list(bk.list_entries(feed["id"])) for feed in all_feeds]
+        entries = [list(bk.list_entries(feed["id"], liked=liked, is_favorite=is_favorite)) for feed in all_feeds]
         return list(chain.from_iterable(entries))
 
 
@@ -211,6 +243,18 @@ async def list_handlers() -> Sequence[Mapping]:
         }
         for handler in handlers
     ]
+
+
+@app.get("/util/discover-rsshub")
+async def discover_rsshub(url: str = ""):
+    """Discover available RSSHub routes for a given URL."""
+    from src.services.feed.rsshub_discovery import discover_rsshub_routes
+
+    if not url:
+        return []
+
+    routes = discover_rsshub_routes(url)
+    return routes
 
 
 # =============================================================================

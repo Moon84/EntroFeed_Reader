@@ -8,11 +8,11 @@ from pytest_mock import MockerFixture
 
 from src.backend import EntroFeedBackend
 from src.constants import DATA_DIR
-from src.db import GlobalSettings
+from src.settings import GlobalSettings
 from src.errors import InvalidFeedException
-from src.impls import load_storage_config
-from src.llm.dummy import DummyLLMHandler
-from src.models import Feed, FeedEntry
+from src.kernel.registry import load_storage_config
+from src.plugins.llm.dummy import DummyLLMHandler
+from src.models.feed import Feed, FeedEntry
 
 
 def dummy_feeds():

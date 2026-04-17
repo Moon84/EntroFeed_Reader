@@ -2,6 +2,15 @@
 """
 Domain Hierarchy - Hierarchical domain classification for cross-domain content analysis.
 
+DEPRECATION WARNING:
+This module is deprecated in favor of the dynamic DomainGraph system with Wikidata integration.
+The hardcoded DOMAIN_HIERARCHY is being phased out. New code should use:
+- DomainGraph for dynamic graph-based domain relationships
+- WikidataResolver for entity standardization
+- Layer 2 (Wikidata-aligned) and Layer 3 (custom entities) instead of Level 0-1 backbone
+
+This module is kept for backward compatibility during the transition period.
+
 This module defines a domain hierarchy inspired by Publication_research's domain system,
 supporting multi-level domains and cross-domain concept detection.
 
@@ -17,6 +26,15 @@ Cross-Domain Concepts:
 - DigitalHealth: Intersection of Digital and Healthcare
 - FinTech: Intersection of Finance and Technology
 """
+
+import warnings
+
+# Issue deprecation warning when module is imported
+warnings.warn(
+    "domain_hierarchy module is deprecated. Use DomainGraph with WikidataResolver instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from typing import Dict, List, Set
 

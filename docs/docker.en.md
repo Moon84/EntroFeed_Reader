@@ -5,14 +5,14 @@
 ```bash
 # 1. Clone the project
 git clone https://github.com/Moon84/EntroFeed_Reader.git
-cd entrofeed
+cd EntroFeed_Reader
 
 # 2. Configure environment variables
-cp .env.example .env
-# Edit .env with your API keys (at minimum DASHSCOPE_API_KEY is required)
+cp configs/handlers.yml.example configs/handlers.yml
+# Edit configs/handlers.yml with your API keys
 
 # 3. Start
-docker-compose up -d
+docker compose up -d
 ```
 
 Access http://localhost:8000
@@ -21,69 +21,84 @@ Access http://localhost:8000
 
 | Container Path | Host Path | Content | Persistence |
 |---------------|-----------|---------|-------------|
-| `/data/db.json` | (volume) | SQLite database | Docker volume `entrofeed_data` |
-| `/data/chroma/` | (volume) | ChromaDB vector database | Docker volume `entrofeed_data` |
-| `/data/ontology.db` | (volume) | Ontology knowledge base | Docker volume `entrofeed_data` |
-| `/data/chat_sessions/` | (volume) | AI chat history | Docker volume `entrofeed_data` |
-| `/data/*.json` | (volume) | Backup files | Docker volume `entrofeed_data` |
-| `/config/feeds.yml` | `./configs/` | Feed configuration | Host directory mount |
-| `/config/settings.yml` | `./configs/` | Application settings | Host directory mount |
-| `/config/handlers.yml` | `./configs/` | Handler configuration | Host directory mount |
+| `/data/entrofeed.db` | (volume) | SQLite database | Docker volume |
+| `/data/chroma/` | (volume) | ChromaDB vector database | Docker volume |
+| `/config/` | `./configs/` | Configuration files | Host directory mount |
 
 **Important**: All business data (articles, reading history, chat records, vector index) is stored in the `data` volume. Please backup regularly.
+
+## Configuration Files
+
+Configuration files are mounted from `./configs/` on the host:
+
+```
+configs/
+├── feeds.yml           # RSS feed sources
+├── handlers.yml        # Handler configurations (LLM, notifications, etc.)
+├── settings.yml        # Application settings
+└── user.md            # User interests profile
+```
+
+### Handler Configuration Example
+
+Edit `configs/handlers.yml`:
+
+```yaml
+openai:
+  api_key: your_openai_api_key
+  model: gpt-4o-mini
+ollama:
+  base_url: http://host.docker.internal:11434/v1
+  model: llama3
+dashscope:
+  api_key: your_dashscope_api_key
+  model: qwen-plus
+```
 
 ## LLM Provider Configuration
 
 ### DashScope (Alibaba Cloud Qwen) - Recommended
 
 1. Get API Key: https://dashscope.console.aliyun.com/
-2. Configure in `.env`:
+2. Configure in `configs/handlers.yml`:
 
+```yaml
+dashscope:
+  api_key: your_api_key_here
+  model: qwen-plus
+```
+
+Then set via UI at **Settings > Handler** or environment variable:
 ```bash
 DEFAULT_LLM_PROVIDER=dashscope
-DASHSCOPE_API_KEY=your_api_key_here
-DASHSCOPE_MODEL=qwen-plus
 ```
 
 ### Ollama (Local Models)
 
 For users who already have Ollama service:
 
+```yaml
+ollama:
+  base_url: http://host.docker.internal:11434/v1
+  model: llama3
+```
+
 ```bash
 DEFAULT_LLM_PROVIDER=ollama
-# In Docker, use host.docker.internal to access host
-OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
-OLLAMA_MODEL=llama3
 ```
 
 **Note**: Ensure Ollama service on the host machine is running and listening on `0.0.0.0:11434`.
 
 ### OpenAI (Optional)
 
+```yaml
+openai:
+  api_key: your_api_key_here
+  model: gpt-4o-mini
+```
+
 ```bash
 DEFAULT_LLM_PROVIDER=openai
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-```
-
-## Directory Structure
-
-```
-entrofeed/
-├── configs/              # Configuration files (need to persist to host)
-│   ├── feeds.yml
-│   ├── settings.yml
-│   └── handlers.yml
-├── data/                 # Data directory (Docker volume)
-│   ├── db.json          # SQLite database
-│   ├── chroma/          # Vector database
-│   ├── ontology.db      # Ontology library
-│   └── chat_sessions/   # AI chat history
-├── docs/                 # Documentation
-├── app/                  # Application code
-├── docker-compose.yml
-├── Dockerfile
-└── .env                  # Environment variables (do not commit to git)
 ```
 
 ## Common Operations
@@ -91,55 +106,56 @@ entrofeed/
 ### View Logs
 
 ```bash
-docker-compose logs -f rss
+docker compose logs -f
 ```
 
 ### Enter Container
 
 ```bash
-docker-compose exec rss bash
+docker compose exec rss bash
 ```
 
 ### Rebuild
 
 ```bash
-docker-compose down
+docker compose down
 git pull
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Backup Data
 
 ```bash
-# Export all data
-docker run --rm -v entrofeed_data:/data -v $(pwd)/backup:/backup alpine \
-  tar czf /backup/entrofeed-data-$(date +%Y%m%d).tar.gz /data
+# Stop services first
+docker compose down
 
-# Backup to host directory
-docker-compose down
+# Backup data and configs
 tar czf entrofeed-backup.tar.gz data/ configs/
+
+# Or backup just the database
+cp data/entrofeed.db ./entrofeed-backup.db
 ```
 
 ### Restore Data
 
 ```bash
 # Stop services
-docker-compose down
+docker compose down
 
 # Restore data
-tarxzf entrofeed-backup.tar.gz
+tar xzf entrofeed-backup.tar.gz
 
 # Restart
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Clean Data (Reset)
 
 ```bash
-docker-compose down
+docker compose down
 docker volume rm entrofeed_data
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Environment Variables Reference
@@ -153,7 +169,6 @@ docker-compose up -d
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama service address |
 | `OLLAMA_MODEL` | `llama3` | Ollama model |
 | `OPENAI_API_KEY` | - | OpenAI API Key |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model |
 | `REFRESH_INTERVAL` | `5` | RSS refresh interval (minutes) |
 | `RECENT_HOURS` | `36` | Recent articles time range (hours) |
 | `RSS_BASE_URL` | `http://localhost:8000` | Base URL for RSS links |
@@ -164,10 +179,10 @@ docker-compose up -d
 
 ```bash
 # Check if containers are running
-docker-compose ps
+docker compose ps
 
 # Check logs
-docker-compose logs rss
+docker compose logs
 
 # Check if port is occupied
 lsof -i :8000
@@ -175,9 +190,9 @@ lsof -i :8000
 
 ### LLM Connection Issues
 
-1. Confirm API Key is correctly configured in `.env`
+1. Confirm handler is correctly configured in `configs/handlers.yml`
 2. For Ollama, confirm host service is accessible: `curl http://localhost:11434/v1/models`
-3. Restart service: `docker-compose restart rss`
+3. Restart service: `docker compose restart`
 
 ### Data Loss
 

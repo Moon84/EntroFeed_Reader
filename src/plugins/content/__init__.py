@@ -6,13 +6,18 @@ from typing import Callable, ClassVar
 
 from src.handlers import ContentRetrievalHandler as OldContentRetrievalHandler
 from src.kernel.registry import PluginBase, PluginRegistry
-from src.models import EntryContent, Feed, FeedEntry
+from src.models.feed import EntryContent, Feed, FeedEntry
 
 
 class ContentPluginBase(PluginBase, OldContentRetrievalHandler):
     """Base class for all content retrieval plugins."""
 
     id: ClassVar[str] = "base_content"
+
+    @classmethod
+    def get_plugin_type(cls) -> str:
+        """Return the plugin type string."""
+        return "content"
 
     @abstractmethod
     async def get_html(self, url: str, use_script: bool) -> str:

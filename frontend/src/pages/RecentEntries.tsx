@@ -14,7 +14,7 @@ const { Sider, Content } = AntLayout
 const { Title, Text } = Typography
 
 type SortKey = 'time' | 'score'
-type FilterKey = 'all' | 'unread'
+type FilterKey = 'all' | 'unread' | 'liked' | 'disliked' | 'favorites'
 
 export function RecentEntries() {
   const { t, i18n } = useTranslation()
@@ -55,6 +55,8 @@ export function RecentEntries() {
 
   const displayedEntries = useMemo(() => {
     let result = [...entries]
+    // Server-side filtering: 'liked', 'disliked', 'favorites' are handled by API
+    // Client-side filtering only for 'unread'
     if (filterKey === 'unread') result = result.filter(e => !readEntryIds.has(e.id))
     if (sortKey === 'score') {
       result.sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
@@ -67,7 +69,12 @@ export function RecentEntries() {
   useEffect(() => {
     let cancelled = false
     setIsLoadingEntries(true)
-    apiGet<FeedEntry[]>('/util/list-feed-entries')
+    const params = new URLSearchParams()
+    if (filterKey === 'liked') params.set('liked', '1')
+    else if (filterKey === 'disliked') params.set('liked', '-1')
+    else if (filterKey === 'favorites') params.set('is_favorite', 'true')
+    const query = params.toString() ? `?${params.toString()}` : ''
+    apiGet<FeedEntry[]>(`/util/list-feed-entries${query}`)
       .then(data => {
         if (cancelled) return
         setEntries(data)
@@ -80,7 +87,7 @@ export function RecentEntries() {
         setIsLoadingEntries(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [filterKey])
 
   useEffect(() => {
     if (!selectedEntry) {
@@ -189,9 +196,12 @@ export function RecentEntries() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Text type="secondary" style={{ fontSize: 11 }}>{t('article.filter')}:</Text>
-              <Select size="small" value={filterKey} onChange={setFilterKey} style={{ width: 80 }}>
+              <Select size="small" value={filterKey} onChange={setFilterKey} style={{ width: 100 }}>
                 <Select.Option value="all">{t('article.all')}</Select.Option>
                 <Select.Option value="unread">{t('article.unread')}</Select.Option>
+                <Select.Option value="liked">喜欢</Select.Option>
+                <Select.Option value="disliked">不喜欢</Select.Option>
+                <Select.Option value="favorites">收藏</Select.Option>
               </Select>
             </div>
           </div>
@@ -319,14 +329,14 @@ export function RecentEntries() {
             </div>
 
             <Modal title={`🌐 ${t('article.translation')}`} open={showTranslation} onCancel={() => setShowTranslation(false)} footer={null} width={700}>
-              <div dangerouslySetInnerHTML={{ __html: translatedContent || '' }} style={{ lineHeight: 1.8 }} />
+              <div className="reader-content-body" dangerouslySetInnerHTML={{ __html: translatedContent || '' }} style={{ lineHeight: 1.8 }} />
             </Modal>
 
             <div style={{ flex: 1, overflow: 'auto', padding: 24, lineHeight: 1.8 }}>
               {isLoadingContent ? (
                 <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
               ) : (
-                <div dangerouslySetInnerHTML={{ __html: (entryContent as any)?.content || '' }} />
+                <div className="reader-content-body" dangerouslySetInnerHTML={{ __html: (entryContent as any)?.content || '' }} />
               )}
             </div>
           </>

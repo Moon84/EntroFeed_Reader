@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useEntries } from '../hooks/useEntries'
 import { useFeeds } from '../hooks/useFeeds'
+import { useReader } from '../context/ReaderContext'
 import { EntryCard } from '../components/EntryCard'
 import { Typography, Skeleton, Empty } from 'antd'
 
@@ -12,8 +14,13 @@ export function FeedEntries() {
   const { id } = useParams<{ id: string }>()
   const { data: feeds } = useFeeds()
   const { data: entries, isLoading } = useEntries(id)
+  const { syncStateFromEntries } = useReader()
 
   const feed = feeds?.find((f) => f.id === id)
+
+  useEffect(() => {
+    if (entries) syncStateFromEntries(entries)
+  }, [entries, syncStateFromEntries])
 
   return (
     <div>

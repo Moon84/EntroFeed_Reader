@@ -79,7 +79,7 @@ class EntroFeedAgent(ReActAgent):
         Returns:
             Configured model instance
         """
-        from src.llm import create_llm_handler
+        from src.plugins.llm import create_llm_handler
         handler = create_llm_handler()
         return handler
 
@@ -186,7 +186,7 @@ Be helpful, concise, and focused on delivering value to the user.
         Returns:
             True if successful
         """
-        from src.ontology import get_ontology_registry
+        from src.services.ontology import get_ontology_registry
 
         try:
             registry = get_ontology_registry()
@@ -208,11 +208,11 @@ Be helpful, concise, and focused on delivering value to the user.
         Returns:
             Execution result dict
         """
-        from src.agents.skills_manager import get_skills_manager
+        from src.skills.executor import SkillExecutor
 
         try:
-            manager = get_skills_manager()
-            return manager.execute_skill(skill_name, {"user_input": user_input})
+            executor = SkillExecutor()
+            return executor.execute(skill_name, {"user_input": user_input})
         except Exception as e:
             logger.error(f"Failed to execute skill {skill_name}: {e}")
             return {"success": False, "error": str(e)}
@@ -223,11 +223,11 @@ Be helpful, concise, and focused on delivering value to the user.
         Returns:
             List of skill info
         """
-        from src.agents.skills_manager import get_skills_manager
+        from src.skills.registry import get_skill_registry
 
         try:
-            manager = get_skills_manager()
-            return manager.list_skills()
+            registry = get_skill_registry()
+            return registry.list_all()
         except Exception as e:
             logger.error(f"Failed to list skills: {e}")
             return []
@@ -244,32 +244,68 @@ def create_model_and_formatter(agent_id: str = None):
     Returns:
         Tuple of (model, formatter)
     """
-    from src.llm import create_llm_handler
+    from src.plugins.llm import create_llm_handler
     handler = create_llm_handler()
     return handler, None
 
 
 class TokenTracker:
-    """Track LLM token usage across sessions."""
+    """Track LLM token usage across sessions with persistent storage."""
 
     _usage: list = []
     _daily_limit: int = 1000000  # 1M tokens daily limit (configurable)
+    _initialized: bool = False
+
+    @classmethod
+    def _ensure_init(cls):
+        """Ensure usage data is loaded from storage."""
+        if cls._initialized:
+            return
+        cls._initialized = True
+        try:
+            from src.storage.singleton import get_storage
+            storage = get_storage()
+            # Load last 7 days of usage from storage
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(days=7)).date().isoformat()
+            records = storage.get_token_usage(since=cutoff)
+            cls._usage = records if records else []
+        except Exception as e:
+            print(f"Failed to load token usage from storage: {e}")
+            cls._usage = []
 
     @classmethod
     def add_usage(cls, model: str, input_tokens: int, output_tokens: int):
         """Add token usage record."""
         from datetime import datetime
-        cls._usage.append({
+        record = {
             "timestamp": datetime.now().isoformat(),
             "model": model,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
-        })
+        }
+        cls._usage.append(record)
+
+        # Record Prometheus metrics
+        try:
+            from src.metrics import record_token_usage
+            record_token_usage(model, input_tokens, output_tokens)
+        except Exception:
+            pass  # Metrics are best-effort
+
+        # Persist to storage
+        try:
+            from src.storage.singleton import get_storage
+            storage = get_storage()
+            storage.save_token_usage(record)
+        except Exception as e:
+            print(f"Failed to persist token usage: {e}")
 
     @classmethod
     def get_today_usage(cls) -> dict:
         """Get today's token usage."""
+        cls._ensure_init()
         from datetime import datetime
         today = datetime.now().date().isoformat()
         today_usage = [
@@ -289,6 +325,7 @@ class TokenTracker:
     @classmethod
     def get_usage_history(cls, days: int = 7) -> list:
         """Get usage history for last N days."""
+        cls._ensure_init()
         from datetime import datetime, timedelta
         cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
         return [u for u in cls._usage if u["timestamp"] >= cutoff]
@@ -297,6 +334,12 @@ class TokenTracker:
     def reset(cls):
         """Reset usage tracking."""
         cls._usage = []
+        try:
+            from src.storage.singleton import get_storage
+            storage = get_storage()
+            storage.clear_token_usage()
+        except Exception as e:
+            print(f"Failed to clear token usage from storage: {e}")
 
 
 __all__ = [

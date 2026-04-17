@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listFeeds, refreshFeed, deleteFeed, updateFeed, importOpml, exportOpml, type FeedFormData } from '../client-api/feeds'
+import { listFeeds, refreshFeed, deleteFeed, updateFeed, importOpml, exportOpml, getFeedStats, type FeedFormData, type FeedStats } from '../client-api/feeds'
 import type { Feed } from '../types'
 
 export function useFeeds() {
@@ -7,6 +7,15 @@ export function useFeeds() {
     queryKey: ['feeds'],
     queryFn: listFeeds,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useFeedStats() {
+  return useQuery<FeedStats[]>({
+    queryKey: ['feed-stats'],
+    queryFn: getFeedStats,
+    staleTime: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   })
 }
 

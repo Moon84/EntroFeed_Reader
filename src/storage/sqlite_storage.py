@@ -18,9 +18,9 @@ from chromadb.config import Settings as ChromaSettings
 from pydantic import BaseModel
 
 from src.constants import DATA_DIR
-from src.db import StorageHandler
+from src.plugins.storage.handler import StorageHandler
 from src.handlers import HandlerBase
-from src.models import EntryContent, Feed, FeedEntry
+from src.models.feed import EntryContent, Feed, FeedEntry
 from src.settings import GlobalSettings
 
 
@@ -143,6 +143,18 @@ class SQLiteStorageHandler(StorageHandler):
             cursor.execute("ALTER TABLE feed_entries ADD COLUMN liked INTEGER DEFAULT 0")
         if 'is_favorite' not in existing_columns:
             cursor.execute("ALTER TABLE feed_entries ADD COLUMN is_favorite INTEGER DEFAULT 0")
+
+        # Token usage table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                model TEXT,
+                input_tokens INTEGER,
+                output_tokens INTEGER,
+                total_tokens INTEGER
+            )
+        """)
 
         self.conn.commit()
 
@@ -291,30 +303,36 @@ class SQLiteStorageHandler(StorageHandler):
         self.conn.commit()
 
     def get_entries(
-        self, feed: Feed = None, after: int = 0
+        self, feed: Feed = None, after: int = 0, liked: int = 0, is_favorite: bool = False
     ) -> List[Mapping[str, FeedEntry]]:
-        """Get entries for feed(s)."""
+        """Get entries for feed(s) with optional filtering."""
         cursor = self.conn.cursor()
 
+        conditions = []
+        params = []
+
         if feed:
-            if after:
-                cursor.execute(
-                    "SELECT * FROM feed_entries WHERE feed_id = ? AND published_at > ? ORDER BY published_at DESC",
-                    (feed.id, after)
-                )
-            else:
-                cursor.execute(
-                    "SELECT * FROM feed_entries WHERE feed_id = ? ORDER BY published_at DESC",
-                    (feed.id,)
-                )
-        else:
-            if after:
-                cursor.execute(
-                    "SELECT * FROM feed_entries WHERE published_at > ? ORDER BY published_at DESC",
-                    (after,)
-                )
-            else:
-                cursor.execute("SELECT * FROM feed_entries ORDER BY published_at DESC")
+            conditions.append("feed_id = ?")
+            params.append(feed.id)
+
+        if after:
+            conditions.append("published_at > ?")
+            params.append(after)
+
+        # liked: 0 = all, 1 = liked only, -1 = disliked only
+        if liked != 0:
+            conditions.append("liked = ?")
+            params.append(liked)
+
+        if is_favorite:
+            conditions.append("is_favorite = 1")
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        cursor.execute(
+            f"SELECT * FROM feed_entries WHERE {where_clause} ORDER BY published_at DESC",
+            tuple(params)
+        )
 
         entries = []
         for row in cursor.fetchall():
@@ -482,22 +500,36 @@ class SQLiteStorageHandler(StorageHandler):
 
     def get_handlers(self) -> Mapping[str, Type[HandlerBase]]:
         """Get all handlers."""
+        from src.kernel.registry import PluginRegistry
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM handlers")
-        handlers = {}
+        handlers: Dict[str, Optional[HandlerBase]] = {i: None for i in self._get_handler_map().keys()}
 
         for row in cursor.fetchall():
             config = json.loads(row["config_json"]) if row["config_json"] else {}
-            handlers[row["id"]] = config
+            plugin_type = self._get_handler_type_for_id(row["id"])
+            if plugin_type:
+                try:
+                    handlers[row["id"]] = PluginRegistry.create(plugin_type, row["id"], **config)
+                except (KeyError, ValueError):
+                    pass
 
         return handlers
 
     def get_handler(self, id: str) -> Type[HandlerBase]:
         """Get handler by ID."""
-        handlers = self.get_handlers()
-        if id not in handlers:
-            raise ValueError(f"Handler {id} not found")
-        return handlers[id]
+        from src.kernel.registry import PluginRegistry
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM handlers WHERE id = ?", (id,))
+        row = cursor.fetchone()
+        if not row:
+            raise KeyError(f"Handler {id} not found")
+
+        config = json.loads(row["config_json"]) if row["config_json"] else {}
+        plugin_type = self._get_handler_type_for_id(id)
+        if plugin_type:
+            return PluginRegistry.create(plugin_type, id, **config)
+        raise KeyError(f"Handler not found: {id}")
 
     # ============ Settings Operations ============
 
@@ -542,6 +574,40 @@ class SQLiteStorageHandler(StorageHandler):
         """Delete feed entry."""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM feed_entries WHERE id = ?", (feed_entry.id,))
+        self.conn.commit()
+
+    # ============ Token Usage Tracking ============
+
+    def save_token_usage(self, usage_record: dict) -> None:
+        """Save a token usage record."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO token_usage (timestamp, model, input_tokens, output_tokens, total_tokens)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            usage_record.get("timestamp"),
+            usage_record.get("model"),
+            usage_record.get("input_tokens", 0),
+            usage_record.get("output_tokens", 0),
+            usage_record.get("total_tokens", 0)
+        ))
+        self.conn.commit()
+
+    def get_token_usage(self, since: str = None) -> list:
+        """Get token usage records since the given ISO date string."""
+        cursor = self.conn.cursor()
+        if since:
+            cursor.execute("""
+                SELECT * FROM token_usage WHERE timestamp >= ? ORDER BY timestamp DESC
+            """, (since,))
+        else:
+            cursor.execute("SELECT * FROM token_usage ORDER BY timestamp DESC")
+        return [dict(row) for row in cursor.fetchall()]
+
+    def clear_token_usage(self) -> None:
+        """Clear all token usage records."""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM token_usage")
         self.conn.commit()
 
     # ============ Cleanup ============

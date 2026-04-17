@@ -43,7 +43,7 @@ class GlobalSettings(BaseModel):
     @field_validator("db", mode="before")
     @classmethod
     def validate_db(cls, val):
-        from src.db import StorageHandler
+        from src.plugins.storage.handler import StorageHandler
 
         if isinstance(val, type) and issubclass(val, StorageHandler):
             return val
@@ -55,35 +55,20 @@ class GlobalSettings(BaseModel):
     @property
     def notification_handler(self) -> NotificationHandler:
         try:
-            config = self.db.get_handler(id=self.notification_handler_key)
-            if isinstance(config, dict):
-                return self.db.handler_map[self.notification_handler_key](**config)
-            elif config:
-                return config
-        except (IndexError, ValueError):
-            pass
-        return self.db.handler_map["null_notification"]()
+            return self.db.get_handler(id=self.notification_handler_key)
+        except (IndexError, ValueError, KeyError):
+            return self.db.reconfigure_handler("null_notification", {})
 
     @property
     def llm_handler(self) -> LLMHandler:
         try:
-            config = self.db.get_handler(id=self.llm_handler_key)
-            if isinstance(config, dict):
-                return self.db.handler_map[self.llm_handler_key](**config)
-            elif config:
-                return config
-        except (IndexError, ValueError):
-            pass
-        return self.db.handler_map["null_llm"]()
+            return self.db.get_handler(id=self.llm_handler_key)
+        except (IndexError, ValueError, KeyError):
+            return self.db.reconfigure_handler("null_llm", {})
 
     @property
     def content_retrieval_handler(self) -> ContentRetrievalHandler:
         try:
-            config = self.db.get_handler(id=self.content_retrieval_handler_key)
-            if isinstance(config, dict):
-                return self.db.handler_map[self.content_retrieval_handler_key](**config)
-            elif config:
-                return config
-        except (IndexError, ValueError):
-            pass
-        return self.db.handler_map["playwright"]()
+            return self.db.get_handler(id=self.content_retrieval_handler_key)
+        except (IndexError, ValueError, KeyError):
+            return self.db.reconfigure_handler("playwright", {})

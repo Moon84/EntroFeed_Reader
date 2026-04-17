@@ -1,19 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { XProvider, Conversations, Sender } from '@ant-design/x'
-import { theme, Button, Typography, Card, List, Tag } from 'antd'
+import { XProvider, Bubble, Sender } from '@ant-design/x'
+import { theme, Button, Typography, Card, List, Tag, message, Tooltip, Space } from 'antd'
+import { CopyOutlined, CheckOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { apiGet, apiPostJson } from '../client-api/client'
+import { marked } from 'marked'
 import type { FeedEntry } from '../types'
+import type { BubbleItemType } from '@ant-design/x'
 
-const { Title, Text } = Typography
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp?: number
-  attachments?: FeedEntry[]
-}
+const { Title, Text, Paragraph } = Typography
 
 interface Session {
   id: string
@@ -23,9 +18,31 @@ interface Session {
   updated_at: string
 }
 
+interface AIResponse {
+  reply?: string
+  success?: boolean
+  session_id?: string
+  session_title?: string
+  sources?: Array<{ title: string; url: string; snippet?: string }>
+  thinking?: string
+}
+
 const SESSION_STORAGE_KEY = 'entrofeed_agent_session'
 
-function AttachmentCard({ entry, onRemove }: { entry: FeedEntry; onRemove?: () => void }) {
+marked.setOptions({ breaks: true, gfm: true })
+
+function MarkdownContent({ content }: { content: string }) {
+  const html = marked.parse(content) as string
+  return (
+    <div
+      className="agent-markdown"
+      style={{ lineHeight: 1.6 }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
+function ArticleAttachmentCard({ entry, onRemove }: { entry: FeedEntry; onRemove?: () => void }) {
   const score = entry.total_score ?? 0
   const scoreColor = score >= 0.7 ? '#15803d' : score >= 0.4 ? '#b45309' : '#6b7280'
   const scoreBg = score >= 0.7 ? '#dcfce7' : score >= 0.4 ? '#fef3c7' : '#f3f4f6'
@@ -69,38 +86,71 @@ function AttachmentCard({ entry, onRemove }: { entry: FeedEntry; onRemove?: () =
   )
 }
 
-function AttachmentSection({ entries, onRemove }: { entries: FeedEntry[]; onRemove?: (id: string) => void }) {
-  if (entries.length === 0) return null
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      message.error('Copy failed')
+    }
+  }
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          📎 {entries.length} article{entries.length > 1 ? 's' : ''} selected for analysis
-        </Text>
-      </div>
-      {entries.map(entry => (
-        <AttachmentCard
-          key={entry.id}
-          entry={entry}
-          onRemove={onRemove ? () => onRemove(entry.id) : undefined}
-        />
-      ))}
-    </div>
+    <Tooltip title={copied ? 'Copied!' : 'Copy'}>
+      <Button
+        size="small"
+        type="text"
+        icon={copied ? <CheckOutlined /> : <CopyOutlined />}
+        onClick={handleCopy}
+        style={{ color: copied ? '#52c41a' : undefined }}
+      />
+    </Tooltip>
+  )
+}
+
+function SourceItem({ source }: { source: { title: string; url: string; snippet?: string } }) {
+  return (
+    <a
+      href={source.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ display: 'block', padding: '4px 0', fontSize: 12 }}
+    >
+      <Text strong style={{ fontSize: 12 }}>{source.title}</Text>
+      {source.snippet && (
+        <Paragraph type="secondary" style={{ fontSize: 11, margin: 0 }} ellipsis={{ rows: 2 }}>
+          {source.snippet}
+        </Paragraph>
+      )}
+    </a>
   )
 }
 
 export function Agent() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<BubbleItemType[]>([])
   const [inputValue, setInputValue] = useState('')
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [showSessionList, setShowSessionList] = useState(false)
   const [pendingAttachments, setPendingAttachments] = useState<FeedEntry[]>([])
-  const conversationsRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const pendingArticleSent = useRef(false)
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom()
+    }
+  }, [messages, scrollToBottom])
 
   useEffect(() => {
     loadSessions()
@@ -109,26 +159,22 @@ export function Agent() {
       loadSession(savedSessionId)
     }
 
-    // Handle pending articles sent from reader
     const pendingIds = localStorage.getItem('entrofeed_pending_articles')
     if (pendingIds && !pendingArticleSent.current) {
       pendingArticleSent.current = true
       localStorage.removeItem('entrofeed_pending_articles')
       const ids: string[] = JSON.parse(pendingIds)
-      // Fetch entries for these IDs
       fetchAndAttachEntries(ids)
     }
   }, [])
 
   const fetchAndAttachEntries = async (ids: string[]) => {
     try {
-      // Fetch entries in parallel - use list-feed-entries which returns all, then filter
       const allEntries = await apiGet<FeedEntry[]>('/util/list-feed-entries')
       const matched = allEntries.filter(e => ids.includes(e.id))
       if (matched.length > 0) {
-        setPendingAttachments(matched)
+        setPendingAttachments(prev => [...prev, ...matched])
       } else {
-        // Fallback: try fetching each individually
         const results = await Promise.allSettled(
           ids.map(id => apiGet<FeedEntry>(`/read/${id}?accept=json`).catch(() => null))
         )
@@ -136,7 +182,7 @@ export function Agent() {
           .filter((r): r is PromiseFulfilledResult<FeedEntry> => r.status === 'fulfilled' && r.value !== null)
           .map(r => r.value)
         if (entries.length > 0) {
-          setPendingAttachments(entries)
+          setPendingAttachments(prev => [...prev, ...entries])
         }
       }
     } catch (e) {
@@ -162,11 +208,10 @@ export function Agent() {
       }>(`/api/agent/sessions/${sessionId}`)
 
       if (res.messages && res.messages.length > 0) {
-        const msgs: Message[] = res.messages.map((m, i) => ({
-          id: `${m.role}-${i}`,
-          role: m.role as 'user' | 'assistant',
+        const msgs: BubbleItemType[] = res.messages.map((m, i) => ({
+          key: `${m.role}-${i}`,
+          role: m.role as 'user' | 'ai',
           content: m.content,
-          timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
         }))
         setMessages(msgs)
         setCurrentSessionId(res.id)
@@ -245,21 +290,39 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
 
     const attachmentsToSend = [...pendingAttachments]
     const messageText = buildMessageWithAttachments(value, attachmentsToSend)
+    const timestamp = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
+    const userMessage: BubbleItemType = {
+      key: `user-${Date.now()}`,
       role: 'user',
       content: messageText,
-      timestamp: Date.now(),
-      attachments: attachmentsToSend,
+      header: timestamp,
+      avatar: <UserOutlined />,
+      footer: attachmentsToSend.length > 0 ? (
+        <div style={{ marginTop: 8 }}>
+          {attachmentsToSend.map(entry => (
+            <ArticleAttachmentCard key={entry.id} entry={entry} />
+          ))}
+        </div>
+      ) : undefined,
+      extra: <CopyButton text={messageText} />,
     }
 
     setMessages(prev => [...prev, userMessage])
     setLoading(true)
     setInputValue('')
 
-    // Keep attachments visible (they stay until explicitly removed)
-    // Don't clear pendingAttachments - user might want to ask follow-ups about same articles
+    const loadingKey = `ai-loading-${Date.now()}`
+    const loadingMessage: BubbleItemType = {
+      key: loadingKey,
+      role: 'ai',
+      content: '',
+      avatar: <RobotOutlined />,
+      header: timestamp,
+      typing: true,
+      loading: true,
+    }
+    setMessages(prev => [...prev, loadingMessage])
 
     try {
       const response = await fetch('/api/agent/chat', {
@@ -268,15 +331,29 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
         body: JSON.stringify({ message: messageText, session_id: currentSessionId }),
       })
 
-      const data = await response.json()
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.reply || "I'm sorry, I couldn't process that request.",
-        timestamp: Date.now(),
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
+      const data: AIResponse = await response.json()
+
+      const assistantMessage: BubbleItemType = {
+        key: `ai-${Date.now()}`,
+        role: 'ai',
+        content: data.reply || "I'm sorry, I couldn't process that request.",
+        header: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        avatar: <RobotOutlined />,
+        extra: <CopyButton text={data.reply || ''} />,
+        footer: data.sources && data.sources.length > 0 ? (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>Sources:</Text>
+            {data.sources.map((s, i) => <SourceItem key={i} source={s} />)}
+          </div>
+        ) : undefined,
+      }
+
+      setMessages(prev => prev.filter(m => m.key !== loadingKey))
       setMessages(prev => [...prev, assistantMessage])
 
       if (data.session_id && data.session_id !== currentSessionId) {
@@ -285,11 +362,17 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
         loadSessions()
       }
     } catch (error) {
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error while processing your request.',
-        timestamp: Date.now(),
+      setMessages(prev => prev.filter(m => m.key !== loadingKey))
+
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      message.error(`Failed: ${errorMsg}`)
+      const errorMessage: BubbleItemType = {
+        key: `error-${Date.now()}`,
+        role: 'ai',
+        content: `Sorry, I encountered an error: ${errorMsg}`,
+        header: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        avatar: <RobotOutlined />,
+        status: 'error',
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
@@ -304,19 +387,6 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
   const clearAttachments = () => {
     setPendingAttachments([])
   }
-
-  // Custom message renderer that shows attachments for user messages
-  const chatItems = messages.map(msg => ({
-    key: msg.id,
-    role: msg.role as 'user' | 'assistant',
-    content: msg.content,
-  }))
-
-  useEffect(() => {
-    if (conversationsRef.current) {
-      conversationsRef.current.scrollTop = conversationsRef.current.scrollHeight
-    }
-  }, [messages])
 
   const SUGGESTIONS = [
     { label: t('agent.showRecommendations'), value: t('agent.showMyRecommendations') },
@@ -334,14 +404,14 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
           <Title level={3} style={{ marginBottom: 4 }}>{t('nav.agent', 'AI Assistant')}</Title>
           <Text type="secondary">{currentSession?.title || t('agent.newChat', 'New Chat')}</Text>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <Space>
           <Button onClick={() => setShowSessionList(!showSessionList)}>
             📋 {t('agent.sessions', 'Sessions')}
           </Button>
           <Button type="primary" onClick={createNewSession}>
             + {t('agent.newChat', 'New')}
           </Button>
-        </div>
+        </Space>
       </div>
 
       {showSessionList && (
@@ -378,20 +448,25 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
         <XProvider
           theme={{ algorithm: theme.defaultAlgorithm, token: { colorPrimary: '#2563eb' } }}
         >
-          <div style={{ flex: 1, overflow: 'auto', padding: 16 }} ref={conversationsRef}>
-            {/* Attachment section */}
-            {pendingAttachments.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    📎 {pendingAttachments.length} article{pendingAttachments.length > 1 ? 's' : ''} attached — AI will fetch content automatically
-                  </Text>
-                  <Button size="small" type="text" onClick={clearAttachments}>Clear all</Button>
-                </div>
-                <AttachmentSection entries={pendingAttachments} onRemove={removeAttachment} />
+          {pendingAttachments.length > 0 && (
+            <div style={{ padding: '12px 16px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  📎 {pendingAttachments.length} article{pendingAttachments.length > 1 ? 's' : ''} attached
+                </Text>
+                <Button size="small" type="text" onClick={clearAttachments}>Clear all</Button>
               </div>
-            )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {pendingAttachments.map(entry => (
+                  <div key={entry.id} style={{ position: 'relative', width: 200 }}>
+                    <ArticleAttachmentCard entry={entry} onRemove={() => removeAttachment(entry.id)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
+          <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
             {messages.length === 0 && pendingAttachments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
@@ -408,8 +483,23 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
                 </div>
               </div>
             ) : (
-              <Conversations items={chatItems} />
+              <Bubble.List
+                items={messages}
+                autoScroll
+                role={{
+                  ai: {
+                    placement: 'start' as const,
+                    variant: 'outlined' as const,
+                    contentRender: (node: React.ReactNode) => typeof node === 'string' ? <MarkdownContent content={node} /> : node,
+                  },
+                  user: {
+                    placement: 'end' as const,
+                    variant: 'filled' as const,
+                  },
+                }}
+              />
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {messages.length > 0 && (
@@ -417,11 +507,6 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
               <Button size="small" onClick={clearCurrentSession}>
                 🗑️ {t('agent.clear', 'Clear')}
               </Button>
-              {pendingAttachments.length > 0 && (
-                <Button size="small" onClick={clearAttachments}>
-                  Clear articles
-                </Button>
-              )}
             </div>
           )}
 
@@ -440,6 +525,34 @@ ${e.preview ? `Preview: ${e.preview.slice(0, 300)}...` : ''}`
           </div>
         </XProvider>
       </Card>
+
+      <style>{`
+        .agent-markdown p { margin: 0 0 8px 0; }
+        .agent-markdown p:last-child { margin-bottom: 0; }
+        .agent-markdown ul, .agent-markdown ol { margin: 0 0 8px 0; padding-left: 20px; }
+        .agent-markdown li { margin: 4px 0; }
+        .agent-markdown code {
+          background: #f5f5f5;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.9em;
+        }
+        .agent-markdown pre {
+          background: #f5f5f5;
+          padding: 12px;
+          border-radius: 8px;
+          overflow-x: auto;
+          margin: 8px 0;
+        }
+        .agent-markdown pre code { background: none; padding: 0; }
+        .agent-markdown a { color: #2563eb; }
+        .agent-markdown blockquote {
+          border-left: 3px solid #d9d9d9;
+          margin: 8px 0;
+          padding-left: 12px;
+          color: #8c8c8c;
+        }
+      `}</style>
     </div>
   )
 }

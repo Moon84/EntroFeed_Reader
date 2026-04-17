@@ -11,24 +11,36 @@ from opml import OpmlDocument, OpmlOutline
 from ruamel.yaml import YAML
 
 from src.constants import CONFIG_DIR, DATA_DIR
-from src.models import EntryContent, Feed, FeedEntry
+from src.models.feed import EntryContent, Feed, FeedEntry
 from src.settings import GlobalSettings
 
 logger = getLogger("uvicorn.error")
 
 
-def _score_and_tag_entry(entry_data: Dict[str, Any]) -> Dict[str, Any]:
+def _score_and_tag_entry(
+    entry_data: Dict[str, Any],
+    feed_entry: FeedEntry = None,
+    feed: Feed = None
+) -> Dict[str, Any]:
     """
-    为条目评分和打标签
+    为条目评分和打标签（统一流程）
+
+    流程：
+    1. 打标签 - 先提取文章标签
+    2. 保存 ContentProfile 到 OntologyRegistry
+    3. 评分 - 使用提取的标签计算图传播分数
 
     Args:
         entry_data: 条目数据
+        feed_entry: FeedEntry 对象（可选，用于通过 ontology registry 处理）
+        feed: Feed 对象（可选）
 
     Returns:
         添加了评分和标签的条目数据
     """
     try:
-        from src.ontology.priority_scorer import get_priority_scorer, get_article_tagger
+        from src.services.ontology.priority_scorer import get_priority_scorer, get_article_tagger
+        from src.services.ontology import get_ontology_registry
 
         scorer = get_priority_scorer()
         tagger = get_article_tagger()
@@ -36,11 +48,47 @@ def _score_and_tag_entry(entry_data: Dict[str, Any]) -> Dict[str, Any]:
         # 获取用户兴趣用于匹配
         user_interests = scorer._get_user_interests_from_registry()
 
-        # 评分
-        scores = scorer.score_article(entry_data, user_interests)
-
-        # 打标签
+        # Step 1: 打标签 - 先提取文章标签
         tags_result = tagger.tag_article(entry_data, user_interests)
+        extracted_tags = tags_result.get("tags", [])
+
+        # Step 2: 将标签加入 entry_data，用于后续评分
+        entry_data_with_tags = {**entry_data, "tags": extracted_tags}
+
+        # Step 3: 保存 ContentProfile 到 OntologyRegistry（用于后续兴趣更新）
+        if feed_entry is not None and feed is not None:
+            try:
+                ontology = get_ontology_registry()
+                content = entry_data.get("content") or entry_data.get("summary")
+                # 创建 ContentProfile 用于存储
+                from src.services.ontology.types import ContentProfile, InterestTag, TagSource
+                profile_tags = []
+                for t in extracted_tags:
+                    if isinstance(t, dict):
+                        from src.services.ontology.types import InterestCategory
+                        cat_str = t.get("category", "other")
+                        try:
+                            cat = InterestCategory(cat_str)
+                        except ValueError:
+                            cat = InterestCategory.OTHER
+                        profile_tags.append(InterestTag(
+                            name=t.get("name", ""),
+                            category=cat,
+                            confidence=t.get("confidence", 0.5),
+                            source=TagSource.RSS if t.get("is_rss_tag") else TagSource.RULE,
+                        ))
+                profile = ContentProfile(
+                    entry_id=feed_entry.id,
+                    tags=profile_tags,
+                    summary=entry_data.get("summary", "")[:500],
+                )
+                ontology.memory.save_content_profile(profile)
+                logger.debug(f"Ontology profile saved for entry: {profile.entry_id}")
+            except Exception as ontology_error:
+                logger.warning(f"Failed to save ontology profile: {ontology_error}")
+
+        # Step 4: 评分 - 使用提取的标签计算各项分数
+        scores = scorer.score_article(entry_data_with_tags, user_interests)
 
         # 合并结果
         return {
@@ -50,7 +98,7 @@ def _score_and_tag_entry(entry_data: Dict[str, Any]) -> Dict[str, Any]:
             "authority_score": scores.get("authority_score", 0),
             "relevance_score": scores.get("relevance_score", 0),
             "impact_score": scores.get("impact_score", 0),
-            "tags": tags_result.get("tags", []),
+            "tags": extracted_tags,
             "matched_interests": tags_result.get("matched_interests", []),
             "has_ontology_match": tags_result.get("has_ontology_match", False),
         }
@@ -145,9 +193,10 @@ class EntroFeedRSS:
                 "rss_tags": rss_tags,
                 "published_at": published_time,
                 "url": entry.link,
+                "content": content if content != "" else None,
             }
-            # 评分和打标签
-            scored_entry = _score_and_tag_entry(entry_data)
+            # 评分和打标签（通过 ontology registry 处理）
+            scored_entry = _score_and_tag_entry(entry_data, feed_entry=feed_entry, feed=feed)
 
             # 直接设置评分和标签字段
             feed_entry.total_score = scored_entry.get("total_score", 0)
@@ -256,8 +305,9 @@ class EntroFeedRSS:
                 "rss_tags": rss_tags,
                 "published_at": published_time,
                 "url": entry.link,
+                "content": content if content != "" else None,
             }
-            scored_entry = _score_and_tag_entry(entry_data)
+            scored_entry = _score_and_tag_entry(entry_data, feed_entry=feed_entry, feed=feed)
 
             feed_entry.total_score = scored_entry.get("total_score", 0)
             feed_entry.recency_score = scored_entry.get("recency_score", 0)
@@ -268,13 +318,22 @@ class EntroFeedRSS:
             feed_entry.matched_interests = scored_entry.get("matched_interests", [])
             feed_entry.has_ontology_match = scored_entry.get("has_ontology_match", False)
 
-            # Sync version - just upsert without content retrieval
+            # Sync version - upserts and retrieves content
             self._upsert_feed_entry_sync(feed=feed, entry=feed_entry)
             return True
 
     def _upsert_feed_entry_sync(self, feed: Feed, entry: FeedEntry) -> None:
-        """Synchronous version of add_feed_entry without content retrieval."""
+        """Synchronous version of add_feed_entry - upserts entry and retrieves content."""
         self.db.upsert_feed_entry(feed=feed, entry=entry)
+
+        # Retrieve content after upsert (same as async add_feed_entry does)
+        if not feed.preview_only:
+            import asyncio
+            try:
+                # Run async content retrieval in the thread pool
+                asyncio.run(self.db.get_entry_content(entry=entry))
+            except Exception as e:
+                logger.warning(f"Failed to retrieve content for entry {entry.id}: {e}")
 
     async def check_feeds(self) -> List:
         now = int(datetime.now(tz=timezone.utc).timestamp())

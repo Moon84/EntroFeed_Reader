@@ -7,9 +7,9 @@ Provides:
 - Interest-based recommendation
 - Trending content recommendation
 """
-from src.recommender.similar import SimilarRecommender, get_similar_recommendations
-from src.recommender.interest_based import InterestBasedRecommender, get_interest_recommendations
-from src.recommender.trending import TrendingRecommender, get_trending_recommendations
+from src.services.recommendation.similar import SimilarRecommender, get_similar_recommendations
+from src.services.recommendation.interest_based import InterestBasedRecommender, get_interest_recommendations
+from src.services.recommendation.trending import TrendingRecommender, get_trending_recommendations
 
 __all__ = [
     "SimilarRecommender",

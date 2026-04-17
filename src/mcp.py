@@ -225,15 +225,15 @@ def create_mcp_server():
                 return [TextContent(type="text", text=json.dumps(recs, indent=2))]
 
             elif name == "get_user_interests":
-                from src.ontology import get_ontology_registry
+                from src.services.ontology import get_ontology_registry
                 registry = get_ontology_registry()
                 category = arguments.get("category")
                 interests = registry.get_user_interests(category=category)
                 return [TextContent(type="text", text=json.dumps([i.to_dict() for i in interests], indent=2))]
 
             elif name == "add_user_interest":
-                from src.ontology import get_ontology_registry
-                from src.ontology.types import InterestTag, InterestCategory, TagSource
+                from src.services.ontology import get_ontology_registry
+                from src.services.ontology.types import InterestTag, InterestCategory, TagSource
 
                 registry = get_ontology_registry()
                 name = arguments.get("name", "").lower()
@@ -256,7 +256,7 @@ def create_mcp_server():
                 return [TextContent(type="text", text=json.dumps(interest.to_dict(), indent=2))]
 
             elif name == "remove_user_interest":
-                from src.ontology import get_ontology_registry
+                from src.services.ontology import get_ontology_registry
                 registry = get_ontology_registry()
                 interest_id = arguments.get("interest_id")
                 success = registry.remove_interest(interest_id)

@@ -12,7 +12,8 @@ from textstat import textstat as txt
 
 from src.constants import GITHUB_LINK, IS_DOCKER
 from src.errors import InvalidFeedException
-from src.models import EntryContent, Feed, FeedEntry, HealthCheck
+from src.models.feed import EntryContent, Feed, FeedEntry
+from src.models.health import HealthCheck
 from src.settings import GlobalSettings
 
 logger = getLogger("uvicorn.error")
@@ -72,7 +73,8 @@ class EntroFeedBackend:
         ]
 
     def list_entries(
-        self, feed_id: Feed = None, time: float = time(), recent: bool = False
+        self, feed_id: Feed = None, time: float = time(), recent: bool = False,
+        liked: int = 0, is_favorite: bool = False
     ):
         if feed_id:
             feed = self.db.get_feed(id=feed_id)
@@ -83,9 +85,9 @@ class EntroFeedBackend:
         start_time = time - (settings.recent_hours * 3600)
 
         if recent:
-            entries = self.db.get_entries(feed, after=start_time)
+            entries = self.db.get_entries(feed, after=start_time, liked=liked, is_favorite=is_favorite)
         else:
-            entries = self.db.get_entries(feed=feed)
+            entries = self.db.get_entries(feed=feed, liked=liked, is_favorite=is_favorite)
 
         for entry in entries:
             feed_entry: FeedEntry = entry["entry"]
@@ -154,7 +156,7 @@ class EntroFeedBackend:
 
             # Trigger ontology read event to update user interests
             try:
-                from src.ontology import get_ontology_registry
+                from src.services.ontology import get_ontology_registry
                 ontology = get_ontology_registry()
                 # Calculate content priority from tags if available
                 content_priority = 0
@@ -182,13 +184,24 @@ class EntroFeedBackend:
             is_favorite=is_favorite,
         )
 
+        # Trigger ontology events for like/dislike
+        try:
+            from src.services.ontology import get_ontology_registry
+            ontology = get_ontology_registry()
+            if liked == 1:
+                ontology.on_entry_liked(entry_id, bool(is_favorite))
+            elif liked == -1:
+                ontology.on_entry_disliked(entry_id)
+        except Exception as e:
+            logger.debug(f"Ontology like/dislike event failed: {e}")
+
     def get_handlers(self):
         handlers = self.db.get_handlers()
 
         return [
             {
                 "type": k,
-                "handler_type": self.db.handler_type_map[k],
+                "handler_type": self.db._get_handler_type_for_id(k),
                 "config": v.model_dump() if v else None,
             }
             for k, v in handlers.items()
@@ -196,16 +209,21 @@ class EntroFeedBackend:
 
     def get_handler_config(self, handler: str):
         try:
-            handler = self.db.get_handler(id=handler)
-            return {"type": handler.id, "config": dumps(handler.model_dump(), indent=4)}
+            handler_obj = self.db.get_handler(id=handler)
+            return {"type": handler_obj.id, "config": dumps(handler_obj.model_dump(), indent=4)}
 
-        except IndexError:
+        except (IndexError, KeyError):
             return {"type": handler, "config": None}
 
     def get_handler_schema(self, handler: str):
-        handler_obj: Type[BaseModel] = self.db.handler_map.get(handler)
-
-        return dumps(handler_obj.model_json_schema(), indent=4)
+        from src.kernel.registry import PluginRegistry
+        plugin_type = self.db._get_handler_type_for_id(handler)
+        if not plugin_type:
+            return "{}"
+        handler_cls = PluginRegistry.get_plugin_cls(plugin_type, handler)
+        if not handler_cls:
+            return "{}"
+        return dumps(handler_cls.model_json_schema(), indent=4)
 
     async def get_settings(self):
         settings: GlobalSettings = self.db.get_settings()
@@ -254,18 +272,15 @@ class EntroFeedBackend:
 
     @staticmethod
     async def list_content_handler_choices():
-        from src.impls import content_retrieval_handlers
-
-        return list(content_retrieval_handlers.keys())
+        from src.kernel.registry import PluginRegistry
+        return list(PluginRegistry.list_plugins("content").keys())
 
     @staticmethod
     async def list_llm_handler_choices():
-        from src.impls import llm_handlers
-
-        return list(llm_handlers.keys())
+        from src.kernel.registry import PluginRegistry
+        return list(PluginRegistry.list_plugins("llm").keys())
 
     @staticmethod
     async def list_notification_handler_choices():
-        from src.impls import notification_handlers
-
-        return list(notification_handlers.keys())
+        from src.kernel.registry import PluginRegistry
+        return list(PluginRegistry.list_plugins("notification").keys())
