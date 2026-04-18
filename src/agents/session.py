@@ -2,6 +2,7 @@
 """Chat Session Management - Handles conversation history and session persistence."""
 
 import json
+import os
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -201,8 +202,6 @@ def get_session_manager() -> ChatSessionManager:
         _manager = ChatSessionManager()
     return _manager
 
-
-import os
 
 __all__ = [
     "Message",

@@ -13,12 +13,12 @@ import re
 from typing import Dict, List, Any, Callable
 
 from .types import (
-    InterestTag,
     UnifiedNode,
     InterestCategory,
     TagSource,
     ContentProfile,
 )
+from .wikidata import WikidataResolver
 from .domain_hierarchy import (
     detect_domains_in_text,
     get_domain_by_name,
