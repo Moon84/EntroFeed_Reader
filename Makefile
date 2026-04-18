@@ -56,7 +56,11 @@ docker-rebuild:
 
 .PHONY: clean
 clean:
-	rm -r ${DATA_DIR}
+	rm -rf $(shell echo "$$DATA_DIR" 2>/dev/null || echo "data")
+
+.PHONY: integration-test
+integration-test:
+	.venv/bin/pytest tests/integration/ -v
 
 .PHONY: unit-test
 unit-test:

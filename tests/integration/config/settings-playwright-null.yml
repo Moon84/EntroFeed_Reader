@@ -1,0 +1,7 @@
+send_notification: false
+theme: forest
+refresh_interval: 60
+notification_handler_key: null_notification
+llm_handler_key: null_llm
+content_retrieval_handler_key: playwright
+finished_onboarding: true
