@@ -1,0 +1,7 @@
+# Ruff configuration
+[lint]
+select = ["F", "E501", "W"]
+ignore = ["E402"]  # Module level imports not at top of file (needed for load_dotenv)
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401", "F811"]
