@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """Integration tests for core modules."""
 
-import os
 import tempfile
 import sqlite3
 import pytest
 from pathlib import Path
 from datetime import datetime
-from unittest.mock import patch, Mock
 
 from src.models.feed import Feed, FeedEntry, EntryContent
 
@@ -291,7 +289,8 @@ class TestStorageDirectSQL:
 
         entry_id = "test_entry_456"
         temp_db.execute(
-            """INSERT INTO feed_entries (id, feed_id, title, url, published_at, updated_at, created_at, updated_at_entry)
+            """INSERT INTO feed_entries
+               (id, feed_id, title, url, published_at, updated_at, created_at, updated_at_entry)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 entry_id,
@@ -430,7 +429,6 @@ class TestOntologyTypesIntegration:
         """Test UnifiedNode mark_accessed (was UserInterest)."""
         from src.services.ontology.types import (
             UnifiedNode,
-            InterestCategory,
         )
 
         interest = UnifiedNode(

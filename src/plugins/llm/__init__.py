@@ -41,19 +41,22 @@ class ModelInfo(BaseModel):
 @dataclass
 class ModelCatalog:
     """Catalog of all available models with their capabilities."""
-    
+
     # DeepSeek models
     deepseek_chat: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="deepseek-chat",
         display_name="DeepSeek V3",
         provider="deepseek",
-        capabilities=[ModelCapability.TEXT, ModelCapability.REASONING, ModelCapability.CODE, ModelCapability.FUNCTION_CALLING],
+        capabilities=[
+            ModelCapability.TEXT, ModelCapability.REASONING,
+            ModelCapability.CODE, ModelCapability.FUNCTION_CALLING
+        ],
         max_tokens=64000,
         context_window=128000,
         description="DeepSeek's latest flagship model with strong reasoning and coding abilities",
         pricing_hint="$0.001/1K tokens"
     ))
-    
+
     deepseek_coder: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="deepseek-coder",
         display_name="DeepSeek Coder",
@@ -64,7 +67,7 @@ class ModelCatalog:
         description="Specialized code generation model",
         pricing_hint="$0.001/1K tokens"
     ))
-    
+
     # Zhipu AI (智谱AI) models
     glm4: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="glm-4",
@@ -76,7 +79,7 @@ class ModelCatalog:
         description="Zhipu's latest flagship model",
         pricing_hint="¥0.1/1K tokens"
     ))
-    
+
     glm4v: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="glm-4v",
         display_name="GLM-4V",
@@ -87,7 +90,7 @@ class ModelCatalog:
         description="Zhipu's vision model with image understanding",
         pricing_hint="¥0.5/1K tokens"
     ))
-    
+
     # Baichuan (百川) models
     baichuan4: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="Baichuan4",
@@ -99,7 +102,7 @@ class ModelCatalog:
         description="Baichuan's latest large language model",
         pricing_hint="¥0.08/1K tokens"
     ))
-    
+
     # Moonshot (月之暗面/Kimi) models
     moonshot_v1: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="moonshot-v1-128k",
@@ -111,7 +114,7 @@ class ModelCatalog:
         description="Moonshot's Kimi with 128K context window",
         pricing_hint="¥0.012/1K tokens"
     ))
-    
+
     moonshot_v1_32k: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="moonshot-v1-32k",
         display_name="Kimi 32K",
@@ -122,7 +125,7 @@ class ModelCatalog:
         description="Moonshot's Kimi with 32K context window",
         pricing_hint="¥0.006/1K tokens"
     ))
-    
+
     # Tencent Hunyuan (腾讯混元) models
     hunyuan_pro: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="hunyuan-pro",
@@ -134,7 +137,7 @@ class ModelCatalog:
         description="Tencent's Hunyuan Pro model",
         pricing_hint="¥0.05/1K tokens"
     ))
-    
+
     hunyuan_vision: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="hunyuan-vision",
         display_name="混元视觉",
@@ -145,7 +148,7 @@ class ModelCatalog:
         description="Tencent's Hunyuan vision model",
         pricing_hint="¥0.1/1K tokens"
     ))
-    
+
     # ByteDance Doubao (字节豆包) models
     doubao_pro: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="Doubao-pro-32k",
@@ -157,7 +160,7 @@ class ModelCatalog:
         description="ByteDance's Doubao Pro model",
         pricing_hint="¥0.003/1K tokens"
     ))
-    
+
     doubao_vision: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="Doubao-vision",
         display_name="豆包视觉",
@@ -168,19 +171,22 @@ class ModelCatalog:
         description="ByteDance's Doubao vision model",
         pricing_hint="¥0.005/1K tokens"
     ))
-    
+
     # OpenAI models (existing)
     gpt4o: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="gpt-4o",
         display_name="GPT-4o",
         provider="openai",
-        capabilities=[ModelCapability.TEXT, ModelCapability.VISION, ModelCapability.FUNCTION_CALLING, ModelCapability.CODE],
+        capabilities=[
+            ModelCapability.TEXT, ModelCapability.VISION,
+            ModelCapability.FUNCTION_CALLING, ModelCapability.CODE
+        ],
         max_tokens=128000,
         context_window=128000,
         description="OpenAI's latest flagship model with vision",
         pricing_hint="$0.015/1K tokens"
     ))
-    
+
     gpt4o_mini: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="gpt-4o-mini",
         display_name="GPT-4o Mini",
@@ -191,30 +197,36 @@ class ModelCatalog:
         description="OpenAI's cost-effective mini model",
         pricing_hint="$0.0015/1K tokens"
     ))
-    
+
     # Qwen models (阿里通义)
     qwen_plus: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="qwen-plus",
         display_name="通义千问Plus",
         provider="dashscope",
-        capabilities=[ModelCapability.TEXT, ModelCapability.REASONING, ModelCapability.CODE, ModelCapability.FUNCTION_CALLING],
+        capabilities=[
+            ModelCapability.TEXT, ModelCapability.REASONING,
+            ModelCapability.CODE, ModelCapability.FUNCTION_CALLING
+        ],
         max_tokens=8000,
         context_window=131072,
         description="Alibaba's Qwen Plus model",
         pricing_hint="¥0.004/1K tokens"
     ))
-    
+
     qwen_max: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="qwen-max",
         display_name="通义千问Max",
         provider="dashscope",
-        capabilities=[ModelCapability.TEXT, ModelCapability.REASONING, ModelCapability.CODE, ModelCapability.FUNCTION_CALLING],
+        capabilities=[
+            ModelCapability.TEXT, ModelCapability.REASONING,
+            ModelCapability.CODE, ModelCapability.FUNCTION_CALLING
+        ],
         max_tokens=8000,
         context_window=131072,
         description="Alibaba's Qwen Max model",
         pricing_hint="¥0.12/1K tokens"
     ))
-    
+
     qwen_vl_max: ModelInfo = field(default_factory=lambda: ModelInfo(
         name="qwen-vl-max",
         display_name="通义千问视觉",
@@ -238,30 +250,30 @@ class ModelCatalog:
             self.gpt4o, self.gpt4o_mini,
             self.qwen_plus, self.qwen_max, self.qwen_vl_max,
         ]
-    
+
     def get_model_info(self, provider: str, model_name: str) -> Optional[ModelInfo]:
         """Get model info by provider and model name."""
         for model in self.get_all_models():
             if model.provider == provider and model.name == model_name:
                 return model
         return None
-    
+
     def get_models_by_provider(self, provider: str) -> List[ModelInfo]:
         """Get all models for a specific provider."""
         return [m for m in self.get_all_models() if m.provider == provider]
-    
+
     def get_models_by_capability(self, capability: ModelCapability) -> List[ModelInfo]:
         """Get all models with a specific capability."""
         return [m for m in self.get_all_models() if capability in m.capabilities]
-    
+
     def get_text_models(self) -> List[ModelInfo]:
         """Get all text generation models."""
         return self.get_models_by_capability(ModelCapability.TEXT)
-    
+
     def get_vision_models(self) -> List[ModelInfo]:
         """Get all vision models."""
         return self.get_models_by_capability(ModelCapability.VISION)
-    
+
     def get_reasoning_models(self) -> List[ModelInfo]:
         """Get all reasoning models."""
         return self.get_models_by_capability(ModelCapability.REASONING)
@@ -326,7 +338,7 @@ Provide the summary in markdown."""
         """Record metrics for this LLM call."""
         if input_tokens > 0 or output_tokens > 0:
             record_token_usage(self.model, input_tokens, output_tokens)
-        
+
         start_time = getattr(self, "_last_call_start", None)
         duration = time.time() - start_time if start_time else 0
         record_llm_request(self.id, self.model, success, duration)
@@ -339,17 +351,17 @@ Provide the summary in markdown."""
     def model_info(self) -> Optional[ModelInfo]:
         """Get the model info for this handler."""
         return MODEL_CATALOG.get_model_info(self.id, self.model)
-    
+
     @property
     def capabilities(self) -> List[ModelCapability]:
         """Get the capabilities of this model."""
         info = self.model_info
         return list(info.capabilities) if info else []
-    
+
     def supports_vision(self) -> bool:
         """Check if this model supports vision."""
         return ModelCapability.VISION in self.capabilities
-    
+
     def supports_function_calling(self) -> bool:
         """Check if this model supports function calling."""
         return ModelCapability.FUNCTION_CALLING in self.capabilities
@@ -444,11 +456,11 @@ class LLMPluginRegistry:
         **kwargs
     ) -> ModelWrapperBase:
         provider = provider or os.getenv("DEFAULT_LLM_PROVIDER", "dashscope")
-        
+
         # Resolve aliases
         handler_id = cls._provider_aliases.get(provider, provider)
         handler_cls = cls._handlers.get(handler_id)
-        
+
         if not handler_cls:
             raise ValueError(f"Unknown LLM provider: {provider}")
 
@@ -458,7 +470,7 @@ class LLMPluginRegistry:
             config["model"] = model
 
         return handler_cls(**config)
-    
+
     @classmethod
     def get_available_providers(cls) -> List[Dict[str, Any]]:
         """Get list of available providers with their status."""
@@ -526,7 +538,11 @@ def get_provider_models(provider: str) -> List[ModelInfo]:
 
 
 # Import all plugins to trigger auto-registration
-from src.plugins.llm import openai, ollama, dashscope, deepseek, zhipu, baichuan, moonshot, tencent, bytedance, dummy, null
+from src.plugins.llm import (
+    openai, ollama, dashscope, deepseek, zhipu,
+    baichuan, moonshot, tencent, bytedance,
+    dummy, null
+)
 
 
 __all__ = [

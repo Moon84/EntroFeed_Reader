@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 """Tests for LLM Plugins and Registry."""
 
-import pytest
-import os
 
 from src.plugins.llm import (
     ModelCapability,
     ModelInfo,
-    ModelCatalog,
     MODEL_CATALOG,
     LLMPluginRegistry,
-    create_llm_handler,
     get_default_provider,
     get_all_models,
     get_provider_models,

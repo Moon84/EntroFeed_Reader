@@ -692,7 +692,6 @@ class GraphPropagationScorer:
             aliases = info.get("aliases", [])
             parent = info.get("parent", "")
             cross_domains = info.get("cross_domains", [])
-            children = info.get("children", [])
 
             # 构建节点索引（用于别名匹配）
             for alias in [domain] + aliases:

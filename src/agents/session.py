@@ -42,7 +42,7 @@ class ChatSession:
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None) -> Message:
+    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> Message:
         """Add a message to the session."""
         msg = Message(role=role, content=content, metadata=metadata or {})
         self.messages.append(msg)
@@ -91,7 +91,7 @@ class ChatSession:
 class ChatSessionManager:
     """Manages multiple chat sessions with persistence."""
 
-    def __init__(self, storage_path: str = None):
+    def __init__(self, storage_path: Optional[str] = None):
         """Initialize session manager.
 
         Args:
@@ -133,7 +133,7 @@ class ChatSessionManager:
         except Exception as e:
             print(f"Failed to save sessions: {e}")
 
-    def create_session(self, title: str = None) -> ChatSession:
+    def create_session(self, title: Optional[str] = None) -> ChatSession:
         """Create a new chat session."""
         session = ChatSession(
             id=str(uuid.uuid4())[:8],
@@ -166,7 +166,7 @@ class ChatSessionManager:
         session_id: str,
         role: str,
         content: str,
-        metadata: Dict[str, Any] = None
+        metadata: Optional[Dict[str, Any]] = None
     ) -> Optional[Message]:
         """Add a message to a session."""
         session = self.get_session(session_id)

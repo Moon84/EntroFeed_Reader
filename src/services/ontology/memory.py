@@ -27,7 +27,6 @@ from .types import (
     UnifiedNode,
     ContentProfile,
     OntologyRelation,
-    InterestTag,
     InterestCategory,
     FollowUpStatus,
     NodeSource,
@@ -38,7 +37,7 @@ from .types import (
 class OntologyMemory:
     """Storage for ontology data using SQLite and ChromaDB."""
 
-    def __init__(self, data_dir: str = None):
+    def __init__(self, data_dir: Optional[str] = None):
         """Initialize ontology storage.
 
         Args:
@@ -46,7 +45,8 @@ class OntologyMemory:
         """
         from src.constants import DATA_DIR as DEFAULT_DATA_DIR
 
-        self.data_dir = Path(data_dir or os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
+        _data_dir = data_dir or os.getenv("DATA_DIR")
+        self.data_dir = Path(_data_dir if _data_dir else str(DEFAULT_DATA_DIR))
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         self.db_path = self.data_dir / "ontology.db"
@@ -72,7 +72,7 @@ class OntologyMemory:
                 node_type TEXT DEFAULT 'concept',
                 layer INTEGER DEFAULT 3,
                 source TEXT DEFAULT 'inference',
-                
+
                 -- Interest tracking fields
                 is_interest INTEGER DEFAULT 0,
                 interest_priority INTEGER DEFAULT 0,
@@ -80,25 +80,25 @@ class OntologyMemory:
                 follow_up_status TEXT DEFAULT 'none',
                 access_count INTEGER DEFAULT 0,
                 last_accessed TEXT,
-                
+
                 -- Wikidata alignment
                 wikidata_label TEXT,
                 wikidata_description TEXT,
                 parent_qids_json TEXT DEFAULT '[]',
                 instance_of_qids_json TEXT DEFAULT '[]',
-                
+
                 -- Additional metadata
                 synonyms_json TEXT DEFAULT '[]',
                 description TEXT DEFAULT '',
                 confidence REAL DEFAULT 1.0,
                 is_seed INTEGER DEFAULT 0,
                 properties_json TEXT DEFAULT '{}',
-                
+
                 -- System fields
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 last_used TEXT,
-                
+
                 UNIQUE(wikidata_qid)
             )
         """)
@@ -278,10 +278,12 @@ class OntologyMemory:
                 node.id,
                 node.name,
                 node.wikidata_qid,
-                node.category.value,
+                node.category.value
+                if hasattr(node.category, "value")
+                else node.category,
                 node.node_type,
-                node.layer,
-                node.source.value,
+                node.level,
+                node.source.value if hasattr(node.source, "value") else node.source,
                 1 if node.is_interest else 0,
                 node.interest_priority,
                 node.interest_level,
@@ -320,9 +322,9 @@ class OntologyMemory:
 
     def get_all_nodes(
         self,
-        layer: int = None,
-        category: InterestCategory = None,
-        is_interest: bool = None,
+        layer: Optional[int] = None,
+        category: Optional[InterestCategory] = None,
+        is_interest: Optional[bool] = None,
     ) -> List[UnifiedNode]:
         """Get all nodes with optional filters."""
         cursor = self.conn.cursor()
@@ -350,12 +352,14 @@ class OntologyMemory:
         cursor = self.conn.cursor()
         if min_priority > 0:
             cursor.execute(
-                "SELECT * FROM nodes WHERE is_interest = 1 AND interest_priority >= ? ORDER BY interest_priority DESC, interest_level DESC",
+                "SELECT * FROM nodes WHERE is_interest = 1 AND interest_priority >= ? "
+                "ORDER BY interest_priority DESC, interest_level DESC",
                 (min_priority,),
             )
         else:
             cursor.execute(
-                "SELECT * FROM nodes WHERE is_interest = 1 ORDER BY interest_priority DESC, interest_level DESC"
+                "SELECT * FROM nodes WHERE is_interest = 1 "
+                "ORDER BY interest_priority DESC, interest_level DESC"
             )
         return [self._row_to_node(row) for row in cursor.fetchall()]
 
@@ -374,9 +378,9 @@ class OntologyMemory:
         search_pattern = f"%{query}%"
         cursor.execute(
             """
-            SELECT * FROM nodes 
+            SELECT * FROM nodes
             WHERE name LIKE ? OR synonyms_json LIKE ?
-            ORDER BY 
+            ORDER BY
                 CASE WHEN name LIKE ? THEN 0 ELSE 1 END,
                 interest_level DESC
             LIMIT ?
@@ -466,7 +470,7 @@ class OntologyMemory:
         """Get ontology node by QID."""
         return self.get_node_by_qid(qid)
 
-    def get_all_ontology_nodes(self, layer: int = None) -> List[UnifiedNode]:
+    def get_all_ontology_nodes(self, layer: Optional[int] = None) -> List[UnifiedNode]:
         """Get all ontology nodes."""
         return self.get_all_nodes(layer=layer, is_interest=False)
 
@@ -525,7 +529,9 @@ class OntologyMemory:
 
     def _row_to_content_profile(self, row: sqlite3.Row) -> ContentProfile:
         """Convert SQLite row to ContentProfile."""
-        tags = [InterestTag(**t) for t in json.loads(row["tags_json"])]
+        from .types import UnifiedNode
+
+        tags = [UnifiedNode(**t) for t in json.loads(row["tags_json"])]
         return ContentProfile(
             id=row["id"],
             entry_id=row["entry_id"],

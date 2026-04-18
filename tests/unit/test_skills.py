@@ -3,7 +3,6 @@
 
 import tempfile
 from pathlib import Path
-import pytest
 
 from src.skills.loader import SkillLoader
 from src.skills.registry import SkillRegistry

@@ -57,22 +57,25 @@ class ContentRetrievalHandler(HandlerBase):
                 logger.info(
                     "Feed is configured to not retrieve content, using rss content"
                 )
-                html = entry.content
+                html = entry.content or ""
             else:
                 html = await self.get_html(url=entry.url, use_script=feed.use_script)
 
-            content = self.get_main_content(content=html)
-            if not html or not content:
+            if not html:
                 return EntryContent(url=entry.url, unretrievable=True)
-            else:
-                summary = summarizer(feed=feed, entry=entry, mk=content)
 
-                return EntryContent(
-                    url=entry.url,
-                    content=content,
-                    summary=markdown(summary) if summary else None,
-                    unretrievable=False if content else True,
-                )
+            content = self.get_main_content(content=html)
+            if not content:
+                return EntryContent(url=entry.url, unretrievable=True)
+
+            summary = summarizer(feed, entry, content)
+
+            return EntryContent(
+                url=entry.url,
+                content=content,
+                summary=markdown(summary) if summary else None,
+                unretrievable=False,
+            )
 
         except Exception as e:
             logger.warning(

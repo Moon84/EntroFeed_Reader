@@ -246,9 +246,7 @@ def create_mcp_server():
             elif name == "add_user_interest":
                 from src.services.ontology import get_ontology_registry
                 from src.services.ontology.types import (
-                    InterestTag,
                     InterestCategory,
-                    TagSource,
                 )
 
                 registry = get_ontology_registry()
@@ -261,11 +259,12 @@ def create_mcp_server():
                 except ValueError:
                     cat = InterestCategory.OTHER
 
-                tag = InterestTag(
-                    name=name, category=cat, source=TagSource.EXPLICIT, confidence=1.0
+                interest = registry.add_interest(
+                    name=name,
+                    category=cat,
+                    priority=priority,
+                    confidence=1.0
                 )
-
-                interest = registry.add_interest(tag, priority)
                 return [
                     TextContent(
                         type="text", text=json.dumps(interest.to_dict(), indent=2)
@@ -277,6 +276,8 @@ def create_mcp_server():
 
                 registry = get_ontology_registry()
                 interest_id = arguments.get("interest_id")
+                if not interest_id:
+                    return [TextContent(type="text", text=json.dumps({"error": "Missing interest_id"}))]
                 success = registry.remove_interest(interest_id)
                 return [
                     TextContent(
@@ -335,7 +336,11 @@ def mcp(port: int, host: str, stdio: bool):
         asyncio.run(run_mcp_server(port, host))
     else:
         # Run TCP server
-        from mcp.server.tcp import create_tcp_server
+        try:
+            from mcp.server.tcp import create_tcp_server  # type: ignore[import-not-found]
+        except ImportError:
+            print("Error: mcp.server.tcp is not available. Install mcp with TCP support.")
+            return
 
         server = create_mcp_server()
         asyncio.run(create_tcp_server(server, host, port))

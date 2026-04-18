@@ -23,7 +23,7 @@ class WikidataResolver:
     RATE_LIMIT_DELAY = 0.1  # 100ms between requests (Wikidata allows ~200 req/sec)
     CACHE_EXPIRY_DAYS = 30  # Cache entries expire after 30 days
 
-    def __init__(self, cache_db_path: str = None):
+    def __init__(self, cache_db_path: Optional[str] = None):
         """Initialize Wikidata resolver.
 
         Args:
@@ -31,11 +31,10 @@ class WikidataResolver:
         """
         if cache_db_path is None:
             from src.constants import DATA_DIR
-            cache_db_path = DATA_DIR / "wikidata_cache.db"
+            self.cache_db_path: Path = DATA_DIR / "wikidata_cache.db"
         else:
-            cache_db_path = Path(cache_db_path)
+            self.cache_db_path = Path(cache_db_path)
 
-        self.cache_db_path = cache_db_path
         self.cache_db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._init_cache_db()
@@ -330,7 +329,7 @@ class WikidataResolver:
         conn.commit()
         conn.close()
 
-    def get_entity_details(self, qid: str, languages: List[str] = None) -> Optional[Dict[str, Any]]:
+    def get_entity_details(self, qid: str, languages: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         """Get detailed entity information (labels, descriptions, aliases).
 
         Args:

@@ -1,7 +1,10 @@
 # Ruff configuration
 [lint]
-select = ["F", "E501", "W"]
+select = ["F", "E", "W"]
 ignore = ["E402"]  # Module level imports not at top of file (needed for load_dotenv)
+
+[lint.pycodestyle]
+max-line-length = 120  # Allow longer lines
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401", "F811"]

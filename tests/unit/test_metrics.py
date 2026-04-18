@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Metrics module."""
 
-import pytest
 
 from src.metrics import (
     LLM_PRICING,

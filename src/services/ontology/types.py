@@ -17,7 +17,7 @@ Updates:
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -106,6 +106,36 @@ class NodeSource(str, Enum):
     INFERRED = "inferred"  # 行为推断
     DERIVED = "derived"  # 规则派生
 
+    def to_tag_source(self) -> "TagSource":
+        """转换为TagSource (向后兼容)"""
+        mapping = {
+            NodeSource.EXPLICIT: TagSource.EXPLICIT,
+            NodeSource.WIKIDATA: TagSource.WIKIDATA,
+            NodeSource.EXTRACTED: TagSource.INFERENCE,
+            NodeSource.INFERRED: TagSource.INFERENCE,
+            NodeSource.DERIVED: TagSource.BEHAVIOR,
+        }
+        return mapping.get(self, TagSource.INFERENCE)
+
+
+class TagSource(str, Enum):
+    """向后兼容的TagSource枚举 (废弃: 使用NodeSource)"""
+
+    EXPLICIT = "explicit"
+    INFERENCE = "inference"
+    BEHAVIOR = "behavior"
+    WIKIDATA = "wikidata"
+
+    def to_node_source(self) -> NodeSource:
+        """转换为NodeSource"""
+        mapping = {
+            TagSource.EXPLICIT: NodeSource.EXPLICIT,
+            TagSource.INFERENCE: NodeSource.INFERRED,
+            TagSource.BEHAVIOR: NodeSource.DERIVED,
+            TagSource.WIKIDATA: NodeSource.WIKIDATA,
+        }
+        return mapping[self]
+
 
 class InterestStatus(str, Enum):
     """兴趣状态"""
@@ -140,7 +170,7 @@ class UnifiedNode(BaseModel):
 
     # ---------- 层级与来源 ----------
     level: int = NodeLevel.KNOWLEDGE.value
-    source: NodeSource = NodeSource.EXTRACTED
+    source: Union[NodeSource, TagSource, str] = NodeSource.EXTRACTED
 
     # ---------- 领域 (字符串，灵活) ----------
     domain: str = "other"  # "technology", "medical", "finance", "ai", "drug", ...
@@ -212,6 +242,8 @@ class UnifiedNode(BaseModel):
         """Handle backward compatibility for legacy field names."""
         if not isinstance(values, dict):
             return values
+
+        # Handle legacy field names
         if "interest_priority" in values:
             values["priority"] = values.pop("interest_priority")
         if "interest_level" in values:
@@ -222,6 +254,27 @@ class UnifiedNode(BaseModel):
                 values["domain"] = cat.value
             elif isinstance(cat, str):
                 values["domain"] = cat
+        if "layer" in values:
+            layer = values.pop("layer")
+            if isinstance(layer, int):
+                values["level"] = layer
+
+        # Handle legacy TagSource -> NodeSource conversion
+        if "source" in values:
+            source = values["source"]
+            if hasattr(source, "to_node_source"):
+                values["source"] = source.to_node_source()
+            elif isinstance(source, str):
+                if source in [e.value for e in NodeSource]:
+                    values["source"] = source
+                else:
+                    source_map = {
+                        "inference": NodeSource.INFERRED,
+                        "behavior": NodeSource.DERIVED,
+                        "extracted": NodeSource.EXTRACTED,
+                    }
+                    values["source"] = source_map.get(source, NodeSource.EXTRACTED)
+
         return values
 
     # ========================================================================
@@ -265,7 +318,7 @@ class UnifiedNode(BaseModel):
         self,
         target_id: str,
         relation_type: RelationType,
-        properties: Dict[str, Any] = None,
+        properties: Optional[Dict[str, Any]] = None,
     ) -> None:
         """添加出向关系"""
         relation = {
@@ -280,7 +333,7 @@ class UnifiedNode(BaseModel):
         self,
         source_id: str,
         relation_type: RelationType,
-        properties: Dict[str, Any] = None,
+        properties: Optional[Dict[str, Any]] = None,
     ) -> None:
         """添加入向关系"""
         relation = {
@@ -291,7 +344,9 @@ class UnifiedNode(BaseModel):
         self.incoming_relations.append(relation)
         self.updated_at = datetime.now().isoformat()
 
-    def get_related_nodes(self, relation_type: RelationType = None) -> List[str]:
+    def get_related_nodes(
+        self, relation_type: Optional[RelationType] = None
+    ) -> List[str]:
         """获取相关节点ID列表"""
         related = []
         for rel in self.outgoing_relations:
@@ -340,13 +395,23 @@ class UnifiedNode(BaseModel):
 
     @property
     def interest_priority(self) -> int:
-        """兼容: priority alias for interest_priority."""
+        """兼容: priority alias for interest_priority (getter)."""
         return self.priority
+
+    @interest_priority.setter
+    def interest_priority(self, value: int) -> None:
+        """兼容: priority alias for interest_priority (setter)."""
+        self.priority = max(0, min(5, value))
 
     @property
     def interest_level(self) -> float:
-        """兼容: relevance alias for interest_level."""
+        """兼容: relevance alias for interest_level (getter)."""
         return self.relevance
+
+    @interest_level.setter
+    def interest_level(self, value: float) -> None:
+        """兼容: relevance alias for interest_level (setter)."""
+        self.relevance = max(0.0, min(1.0, value))
 
     @property
     def follow_up_status(self) -> "FollowUpStatus":
@@ -489,9 +554,9 @@ class ContentProfile(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     entry_id: str
-    tags: List["InterestTag"] = Field(
+    tags: List[Union["InterestTag", "UnifiedNode"]] = Field(
         default_factory=list
-    )  # Keep InterestTag for compatibility
+    )  # Accept both for backward compatibility
     priority: int = Field(default=0, ge=0, le=5)
     summary: str = ""
     key_entities: List[str] = Field(default_factory=list)
@@ -508,21 +573,19 @@ class ContentProfile(BaseModel):
 
     def get_unified_tags(self) -> List["UnifiedNode"]:
         """Get tags as UnifiedNodes."""
-        return [tag.to_unified_node() for tag in self.tags]
+        result = []
+        for tag in self.tags:
+            if isinstance(tag, UnifiedNode):
+                result.append(tag)
+            else:
+                # InterestTag -> UnifiedNode
+                result.append(tag.to_unified_node())
+        return result
 
 
 # =============================================================================
 # 向后兼容类型 (废弃警告)
 # =============================================================================
-
-
-class TagSource(str, Enum):
-    """废弃: 使用 NodeSource"""
-
-    EXPLICIT = "explicit"
-    INFERENCE = "inference"
-    BEHAVIOR = "behavior"
-    WIKIDATA = "wikidata"
 
 
 class InterestCategory(str, Enum):
@@ -585,6 +648,19 @@ class InterestTag(BaseModel):
     @classmethod
     def from_unified_node(cls, node: UnifiedNode) -> "InterestTag":
         """Create InterestTag from UnifiedNode."""
+        # Handle source conversion
+        if isinstance(node.source, TagSource):
+            tag_source = node.source
+        elif isinstance(node.source, NodeSource):
+            tag_source = TagSource(node.source.to_tag_source())
+        elif isinstance(node.source, str):
+            try:
+                tag_source = TagSource(node.source)
+            except ValueError:
+                tag_source = TagSource.INFERENCE
+        else:
+            tag_source = TagSource.INFERENCE
+
         return cls(
             id=node.id,
             name=node.name,
@@ -592,9 +668,7 @@ class InterestTag(BaseModel):
             if node.domain in [c.value for c in InterestCategory]
             else InterestCategory.OTHER,
             confidence=node.confidence,
-            source=TagSource(node.source.value)
-            if isinstance(node.source, NodeSource)
-            else node.source,
+            source=tag_source,
             synonyms=node.synonyms,
             properties=node.properties,
             wikidata_qid=node.wikidata_qid,

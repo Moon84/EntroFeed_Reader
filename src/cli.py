@@ -1,11 +1,12 @@
 from logging import INFO, getLogger
 from os import PathLike
 from pathlib import Path
+from tempfile import SpooledTemporaryFile
 
 import asyncclick as click
 
 from src.app import rss
-from src.mcp import mcp
+from src.mcp import mcp  # type: ignore[attr-defined]
 
 logger = getLogger("cli")
 logger.setLevel(INFO)
@@ -16,7 +17,7 @@ def cli():
     pass
 
 
-cli.add_command(mcp)
+cli.add_command(mcp)  # type: ignore[arg-type]
 
 
 @cli.command()
@@ -39,8 +40,11 @@ async def restore(file_path: PathLike):
     """
     Restore a json-format backup of the EntroFeed state
     """
-    with open(Path(file_path).resolve(), "r") as fp:
-        await rss.restore(fp)
+    with open(Path(file_path).resolve(), "rb") as fp:
+        spooled = SpooledTemporaryFile()
+        spooled.write(fp.read())
+        spooled.seek(0)
+        await rss.restore(spooled)  # type: ignore[arg-type]
 
 
 @cli.command()
@@ -63,8 +67,11 @@ async def import_opml(file_path: PathLike):
     """
     Import an opml-formatted feed list into EntroFeed
     """
-    with open(Path(file_path).resolve(), "r") as fp:
-        await rss.opml_to_feeds(fp)
+    with open(Path(file_path).resolve(), "rb") as fp:
+        spooled = SpooledTemporaryFile()
+        spooled.write(fp.read())
+        spooled.seek(0)
+        await rss.opml_to_feeds(spooled)  # type: ignore[arg-type]
 
 
 @cli.command()

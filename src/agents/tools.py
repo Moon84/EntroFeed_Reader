@@ -163,7 +163,7 @@ def add_user_interest(
     Returns:
         JSON string with result
     """
-    from src.services.ontology.types import InterestTag, InterestCategory, TagSource
+    from src.services.ontology.types import InterestCategory
 
     registry = get_ontology_registry()
 
@@ -172,14 +172,12 @@ def add_user_interest(
     except ValueError:
         cat = InterestCategory.OTHER
 
-    tag = InterestTag(
+    interest = registry.add_interest(
         name=name.lower(),
         category=cat,
-        source=TagSource.EXPLICIT,
+        priority=priority,
         confidence=1.0
     )
-
-    interest = registry.add_interest(tag, priority)
 
     return json.dumps({
         "success": True,

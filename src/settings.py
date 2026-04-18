@@ -40,6 +40,13 @@ class GlobalSettings(BaseModel):
 
     db: Any = Field(exclude=True)
 
+    @field_validator("theme", mode="before")
+    @classmethod
+    def validate_theme(cls, val):
+        if isinstance(val, str):
+            return Themes(val)
+        return val
+
     @field_validator("db", mode="before")
     @classmethod
     def validate_db(cls, val):

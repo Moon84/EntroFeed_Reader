@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Agents module."""
 
-from datetime import datetime
-import pytest
 
 from src.agents.session import Message, ChatSession
 
@@ -56,7 +54,7 @@ class TestChatSession:
     def test_add_message(self):
         """Test adding messages to session."""
         session = ChatSession(id="test-123")
-        msg = session.add_message(role="user", content="Hello")
+        session.add_message(role="user", content="Hello")
 
         assert len(session.messages) == 1
         assert session.messages[0].content == "Hello"

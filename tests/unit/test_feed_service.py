@@ -4,7 +4,7 @@
 from datetime import datetime, timezone
 from calendar import timegm
 from io import BytesIO
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock
 import pytest
 
 from src.services.feed.service import (
@@ -12,7 +12,6 @@ from src.services.feed.service import (
     _score_and_tag_entry,
     EntroFeedRSS,
 )
-from src.models.feed import Feed
 
 
 class TestGetEntryTime:
@@ -139,8 +138,8 @@ class TestFeedOperations:
 
         # Should have called get_feed
         assert mock_db.get_feed.called
-        # Method returns None, so result should be None
-        assert result is None
+        # Method returns an empty list when no entries
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_add_feed_entry(self):

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for Scheduler module."""
 
-from datetime import datetime, timezone
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock
 import pytest
 
 from src.scheduler import SchedulerManager
@@ -125,7 +124,6 @@ class TestSchedulerManager:
             return "v2"
 
         scheduler.add_interval_task(task_id="replaceable", func=task_v1, minutes=5)
-        original_job = scheduler.scheduler.get_job("replaceable")
 
         scheduler.add_interval_task(task_id="replaceable", func=task_v2, minutes=10)
         updated_job = scheduler.scheduler.get_job("replaceable")

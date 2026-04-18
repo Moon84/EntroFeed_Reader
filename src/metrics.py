@@ -10,13 +10,13 @@ from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTEN
 TOKEN_USAGE_TOTAL = Counter(
     "entrofeed_token_usage_total",
     "Total token usage",
-    ["model", "type"]  # type: input, output
+    ["model", "type"]  # labels: input, output
 )
 
 LLM_REQUESTS_TOTAL = Counter(
     "entrofeed_llm_requests_total",
     "Total LLM API requests",
-    ["provider", "model", "status"]  # status: success, error
+    ["provider", "model", "status"]  # labels: success, error
 )
 
 LLM_REQUEST_DURATION = Histogram(
@@ -56,7 +56,7 @@ FEED_REFRESH_DURATION = Histogram(
 RECOMMENDATION_REQUESTS = Counter(
     "entrofeed_recommendation_requests_total",
     "Total recommendation requests",
-    ["type"]  # type: interest, trending, similar
+    ["type"]  # labels: interest, trending, similar
 )
 
 # Plugin lifecycle metrics
@@ -108,7 +108,7 @@ class PluginCheckResult:
     """Result of plugin availability check."""
     available: bool
     reason: Optional[str] = None
-    missing_env: list[str] = None
+    missing_env: Optional[list[str]] = None
 
     def __post_init__(self):
         if self.missing_env is None:
@@ -130,7 +130,7 @@ def record_llm_request(provider: str, model: str, success: bool, duration: float
 
 def record_llm_cost(provider: str, model: str, input_tokens: int, output_tokens: int):
     """Record LLM cost in USD based on token usage.
-    
+
     Args:
         provider: LLM provider ID (e.g., 'deepseek', 'dashscope')
         model: Model name (e.g., 'deepseek-chat', 'qwen-plus')
@@ -156,7 +156,7 @@ def record_plugin_shutdown(plugin_type: str, plugin_id: str):
     PLUGIN_STATUS.labels(plugin_type=plugin_type, plugin_id=plugin_id).set(-1)
 
 
-def record_plugin_check(plugin_type: str, plugin_id: str, available: bool, reason: str = None):
+def record_plugin_check(plugin_type: str, plugin_id: str, available: bool, reason: Optional[str] = None):
     """Record plugin health check result."""
     PLUGIN_OPERATIONS.labels(plugin_type=plugin_type, plugin_id=plugin_id, operation="check").inc()
     PLUGIN_STATUS.labels(plugin_type=plugin_type, plugin_id=plugin_id).set(1 if available else 0)

@@ -109,7 +109,7 @@ class TestInputValidation:
         assert response.status_code in [400, 422]
 
 
-class TestInputValidation:
+class TestJSONInputValidation:
     """Test input validation for JSON endpoints."""
 
     @pytest.mark.asyncio

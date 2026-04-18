@@ -113,7 +113,7 @@ class StorageHandler(ABC):
 
     @abstractmethod
     def get_entries(
-        self, feed: Feed = None, after: int = 0, liked: int = 0, is_favorite: bool = False
+        self, feed: Optional[Feed] = None, after: int = 0, liked: int = 0, is_favorite: bool = False
     ) -> List[Mapping[str, FeedEntry]]:
         """
         Given a feed, retrieve the entries for that feed and return a list of

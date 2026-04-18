@@ -13,7 +13,6 @@ import sys
 import os
 import sqlite3
 from pathlib import Path
-from collections import defaultdict
 from typing import List, Dict, Any
 
 # Add project root to path
@@ -226,7 +225,7 @@ def analyze_graph_coefficient_coverage(results: List[Dict[str, Any]]):
     hop1_match = sum(1 for r in results if 0.4 <= r.get("graph_coefficient", 0) < 0.9)
     hop2_match = sum(1 for r in results if 0.1 <= r.get("graph_coefficient", 0) < 0.4)
 
-    print(f"\nBreakdown:")
+    print("\nBreakdown:")
     print(f"  Exact match (≥0.9): {exact_match} ({exact_match/total*100:.1f}%)")
     print(f"  1-hop match (0.4-0.9): {hop1_match} ({hop1_match/total*100:.1f}%)")
     print(f"  2-hop match (0.1-0.4): {hop2_match} ({hop2_match/total*100:.1f}%)")
@@ -278,7 +277,7 @@ def main():
     # Debug: Check first article's tags
     if results:
         first = results[0]
-        print(f"\nDEBUG - First article tags:")
+        print("\nDEBUG - First article tags:")
         for tag in first.get("tags", [])[:3]:
             print(f"  - {tag.get('name')}: QID={tag.get('wikidata_qid')}")
         print(f"  Graph coefficient: {first.get('graph_coefficient', 0)}")
@@ -298,7 +297,7 @@ def main():
     print(f"Std Dev: {stats['std']:.4f}")
     print(f"Min: {stats['min']:.4f}")
     print(f"Max: {stats['max']:.4f}")
-    print(f"\nPercentiles:")
+    print("\nPercentiles:")
     print(f"  P10: {stats['p10']:.4f}")
     print(f"  P25: {stats['p25']:.4f}")
     print(f"  P50: {stats['p50']:.4f}")

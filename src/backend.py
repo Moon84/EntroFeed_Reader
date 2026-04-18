@@ -72,7 +72,7 @@ class EntroFeedBackend:
         ]
 
     def list_entries(
-        self, feed_id: Feed = None, time: float = time(), recent: bool = False,
+        self, feed_id: Optional[str] = None, time: float = time(), recent: bool = False,
         liked: int = 0, is_favorite: bool = False
     ):
         if feed_id:

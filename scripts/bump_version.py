@@ -2,7 +2,6 @@
 """Synchronize version from pyproject.toml to frontend/package.json."""
 
 import json
-import sys
 from pathlib import Path
 
 

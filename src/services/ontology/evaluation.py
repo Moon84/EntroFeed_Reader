@@ -15,7 +15,6 @@ from typing import Dict, List, Optional
 
 from .types import (
     UnifiedNode,
-    InterestTag,
     ContentProfile,
     TagSource,
     InterestCategory,
@@ -82,7 +81,7 @@ class InterestUpdater:
 
     def update_interests_on_read(
         self,
-        content_tags: List[InterestTag],
+        content_tags: List[UnifiedNode],
         content_priority: int,
         user_interests: List[UnifiedNode],
     ) -> List[UnifiedNode]:
@@ -137,7 +136,7 @@ class InterestUpdater:
 
     def update_interests_on_like(
         self,
-        content_tags: List[InterestTag],
+        content_tags: List[UnifiedNode],
         user_interests: List[UnifiedNode],
         is_favorited: bool = False,
     ) -> List[UnifiedNode]:
@@ -186,7 +185,7 @@ class InterestUpdater:
         return list(updated.values())
 
     def update_interests_on_dislike(
-        self, content_tags: List[InterestTag], user_interests: List[UnifiedNode]
+        self, content_tags: List[UnifiedNode], user_interests: List[UnifiedNode]
     ) -> List[UnifiedNode]:
         """Update user interests after disliking content.
 
@@ -264,7 +263,7 @@ class InterestUpdater:
         return None
 
     def _find_existing_interest(
-        self, tag: InterestTag, user_interests: List[UnifiedNode]
+        self, tag: UnifiedNode, user_interests: List[UnifiedNode]
     ) -> Optional[UnifiedNode]:
         """Find existing interest matching the tag.
 
@@ -324,7 +323,7 @@ class InterestInferrer:
         profiles: List[ContentProfile],
         existing_interests: List[UnifiedNode],
         min_confidence: float = 0.3,
-    ) -> List[InterestTag]:
+    ) -> List[UnifiedNode]:
         """Infer new interests from reading history.
 
         Args:
@@ -333,10 +332,9 @@ class InterestInferrer:
             min_confidence: Minimum confidence threshold
 
         Returns:
-            List of inferred interest tags
+            List of inferred UnifiedNodes
         """
         existing_names = {i.name.lower() for i in existing_interests}
-        existing_categories = {i.category for i in existing_interests}
 
         tag_counts: Dict[str, int] = {}
 
@@ -367,11 +365,12 @@ class InterestInferrer:
 
                 confidence = min(0.9, 0.2 + (count * 0.1))
                 inferred.append(
-                    InterestTag(
+                    UnifiedNode(
                         name=tag_name,
                         category=category,
                         confidence=confidence,
                         source=TagSource.INFERENCE,
+                        is_interest=False,
                     )
                 )
 

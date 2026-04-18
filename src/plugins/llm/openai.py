@@ -29,18 +29,19 @@ class OpenAILLMHandler(ModelWrapperBase, LLMHandler):
         start_time = time.time()
         try:
             completion = client.chat.completions.create(
-                messages=messages,
-                model=self.model,
-                **kwargs
+                messages=messages, model=self.model, **kwargs
             )
 
             # Record metrics
             usage = completion.usage
             if usage:
-                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+                record_token_usage(
+                    self.model, usage.prompt_tokens, usage.completion_tokens
+                )
             record_llm_request(self.id, self.model, True, time.time() - start_time)
 
-            return completion.choices[0].message.content
+            content = completion.choices[0].message.content
+            return content if content is not None else ""
         except Exception:
             record_llm_request(self.id, self.model, False, time.time() - start_time)
             raise
@@ -49,7 +50,7 @@ class OpenAILLMHandler(ModelWrapperBase, LLMHandler):
         """Summarize content using OpenAI."""
         return self._make_chat_call(
             system=self.summarization_system_prompt,
-            prompt=self.get_summarization_prompt(mk)
+            prompt=self.get_summarization_prompt(mk),
         )
 
 

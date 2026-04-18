@@ -8,12 +8,12 @@ This module provides:
 - Automatic tag inference
 - Cross-domain detection
 """
+
 import json
 import re
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 
 from .types import (
-    InterestTag,
     UnifiedNode,
     InterestCategory,
     TagSource,
@@ -33,9 +33,17 @@ class TagGenerator:
     """Generate tags from content using LLM."""
 
     DEFAULT_TAG_CATEGORIES = [
-        "technology", "medical", "finance", "science",
-        "business", "education", "entertainment", "sports",
-        "politics", "society", "other"
+        "technology",
+        "medical",
+        "finance",
+        "science",
+        "business",
+        "education",
+        "entertainment",
+        "sports",
+        "politics",
+        "society",
+        "other",
     ]
 
     TAG_EXTRACTION_PROMPT = """
@@ -57,8 +65,8 @@ Return ONLY valid JSON, no markdown formatting.
 
     def __init__(
         self,
-        llm_summarizer: Callable[[Feed, FeedEntry, str], str] = None,
-        wikidata_resolver: 'WikidataResolver' = None
+        llm_summarizer: Optional[Callable[[Feed, FeedEntry, str], str]] = None,
+        wikidata_resolver: Optional["WikidataResolver"] = None,
     ):
         """Initialize tag generator.
 
@@ -70,7 +78,9 @@ Return ONLY valid JSON, no markdown formatting.
         self.llm_summarizer = llm_summarizer
         self.wikidata_resolver = wikidata_resolver
 
-    def extract_tags(self, entry: FeedEntry, feed: Feed, content: str = None) -> ContentProfile:
+    def extract_tags(
+        self, entry: FeedEntry, feed: Feed, content: Optional[str] = None
+    ) -> ContentProfile:
         """Extract tags and create content profile.
 
         Args:
@@ -90,22 +100,19 @@ Return ONLY valid JSON, no markdown formatting.
             return self._extract_rule_based(entry, feed, body, preview)
 
     def _extract_with_llm(
-        self,
-        entry: FeedEntry,
-        feed: Feed,
-        body: str,
-        preview: str
+        self, entry: FeedEntry, feed: Feed, body: str, preview: str
     ) -> ContentProfile:
         """Extract tags using LLM."""
         prompt = self.TAG_EXTRACTION_PROMPT.format(
             categories=", ".join(self.DEFAULT_TAG_CATEGORIES),
             title=entry.title,
             preview=preview[:500],
-            body=body
+            body=body,
         )
 
         try:
             # Use existing summarizer if available
+            assert self.llm_summarizer is not None
             result = self.llm_summarizer(feed, entry, prompt)
             parsed = json.loads(result)
 
@@ -129,33 +136,81 @@ Return ONLY valid JSON, no markdown formatting.
                 summary=entry.content[:200] if entry.content else "",
                 key_entities=parsed.get("key_entities", []),
                 key_concepts=parsed.get("key_concepts", []),
-                language=self._detect_language(body)
+                language=self._detect_language(body),
             )
         except (json.JSONDecodeError, Exception):
             # Fallback to rule-based
             return self._extract_rule_based(entry, feed, body, preview)
 
     def _extract_rule_based(
-        self,
-        entry: FeedEntry,
-        feed: Feed,
-        body: str,
-        preview: str
+        self, entry: FeedEntry, feed: Feed, body: str, preview: str
     ) -> ContentProfile:
         """Extract tags using rule-based approach."""
         text = f"{entry.title} {preview} {body}".lower()
 
         # Common tech keywords
-        tech_keywords = ["ai", "machine learning", "python", "software", "tech", "startup",
-                        "api", "cloud", "data", "algorithm", "python", "javascript"]
-        medical_keywords = ["medical", "health", "doctor", "patient", "hospital", "treatment",
-                          "disease", "drug", "clinical", "patient"]
-        finance_keywords = ["stock", "market", "investment", "bank", "finance", "economy",
-                          "revenue", "billion", " IPO", "cryptocurrency", "fintech"]
-        science_keywords = ["research", "study", "scientist", "experiment", "discovery",
-                          "physics", "chemistry", "biology", "space", "nasa"]
-        business_keywords = ["company", "ceo", "startup", "funding", "acquisition",
-                           "partnership", "launch", "product", "strategy"]
+        tech_keywords = [
+            "ai",
+            "machine learning",
+            "python",
+            "software",
+            "tech",
+            "startup",
+            "api",
+            "cloud",
+            "data",
+            "algorithm",
+            "python",
+            "javascript",
+        ]
+        medical_keywords = [
+            "medical",
+            "health",
+            "doctor",
+            "patient",
+            "hospital",
+            "treatment",
+            "disease",
+            "drug",
+            "clinical",
+            "patient",
+        ]
+        finance_keywords = [
+            "stock",
+            "market",
+            "investment",
+            "bank",
+            "finance",
+            "economy",
+            "revenue",
+            "billion",
+            " IPO",
+            "cryptocurrency",
+            "fintech",
+        ]
+        science_keywords = [
+            "research",
+            "study",
+            "scientist",
+            "experiment",
+            "discovery",
+            "physics",
+            "chemistry",
+            "biology",
+            "space",
+            "nasa",
+        ]
+        business_keywords = [
+            "company",
+            "ceo",
+            "startup",
+            "funding",
+            "acquisition",
+            "partnership",
+            "launch",
+            "product",
+            "strategy",
+        ]
 
         detected_tags = []
 
@@ -168,23 +223,17 @@ Return ONLY valid JSON, no markdown formatting.
 
         for kw in medical_keywords:
             if kw in text:
-                tag = self._resolve_tag_with_wikidata(
-                    kw, InterestCategory.MEDICAL, 0.6
-                )
+                tag = self._resolve_tag_with_wikidata(kw, InterestCategory.MEDICAL, 0.6)
                 detected_tags.append(tag)
 
         for kw in finance_keywords:
             if kw in text:
-                tag = self._resolve_tag_with_wikidata(
-                    kw, InterestCategory.FINANCE, 0.6
-                )
+                tag = self._resolve_tag_with_wikidata(kw, InterestCategory.FINANCE, 0.6)
                 detected_tags.append(tag)
 
         for kw in science_keywords:
             if kw in text:
-                tag = self._resolve_tag_with_wikidata(
-                    kw, InterestCategory.SCIENCE, 0.6
-                )
+                tag = self._resolve_tag_with_wikidata(kw, InterestCategory.SCIENCE, 0.6)
                 detected_tags.append(tag)
 
         for kw in business_keywords:
@@ -195,7 +244,9 @@ Return ONLY valid JSON, no markdown formatting.
                 detected_tags.append(tag)
 
         # Extract entities (simple capitalized phrase detection)
-        entities = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', f"{entry.title} {preview}")
+        entities = re.findall(
+            r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", f"{entry.title} {preview}"
+        )
         entities = [e for e in entities if len(e) > 2][:10]
 
         return ContentProfile(
@@ -204,7 +255,7 @@ Return ONLY valid JSON, no markdown formatting.
             summary=preview[:200] if preview else "",
             key_entities=entities,
             key_concepts=list(set([t.name for t in detected_tags])),
-            language=self._detect_language(body)
+            language=self._detect_language(body),
         )
 
     def _detect_language(self, text: str) -> str:
@@ -213,19 +264,16 @@ Return ONLY valid JSON, no markdown formatting.
             return "en"
 
         # Check for Chinese characters
-        if re.search(r'[\u4e00-\u9fff]', text):
+        if re.search(r"[\u4e00-\u9fff]", text):
             return "zh"
         # Check for Japanese
-        if re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):
+        if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text):
             return "ja"
         return "en"
 
     def _resolve_tag_with_wikidata(
-        self,
-        tag_name: str,
-        category: InterestCategory,
-        confidence: float
-    ) -> InterestTag:
+        self, tag_name: str, category: InterestCategory, confidence: float
+    ) -> UnifiedNode:
         """Resolve tag name to Wikidata QID if possible.
 
         Args:
@@ -234,21 +282,22 @@ Return ONLY valid JSON, no markdown formatting.
             confidence: Confidence score
 
         Returns:
-            InterestTag with Wikidata fields populated if found
+            UnifiedNode with Wikidata fields populated if found
         """
         if not self.wikidata_resolver or not tag_name:
-            return InterestTag(
+            return UnifiedNode(
                 name=tag_name,
                 category=category,
                 confidence=confidence,
-                source=TagSource.INFERENCE
+                source=TagSource.INFERENCE,
+                is_interest=False,
             )
 
         # Try to resolve via Wikidata
         result = self.wikidata_resolver.resolve(tag_name, language="en")
 
         if result:
-            return InterestTag(
+            return UnifiedNode(
                 name=tag_name,
                 category=category,
                 confidence=confidence,
@@ -256,20 +305,23 @@ Return ONLY valid JSON, no markdown formatting.
                 wikidata_qid=result["qid"],
                 wikidata_label=result["label"],
                 wikidata_description=result.get("description", ""),
-                synonyms=result.get("aliases", [])
+                synonyms=result.get("aliases", []),
+                is_interest=False,
             )
         else:
             # No Wikidata match, create custom entity ID
             import uuid
+
             custom_qid = f"entrofeed:{uuid.uuid4().hex[:8]}"
-            return InterestTag(
+            return UnifiedNode(
                 name=tag_name,
                 category=category,
                 confidence=confidence,
                 source=TagSource.INFERENCE,
                 wikidata_qid=custom_qid,
                 wikidata_label=tag_name,
-                wikidata_description=f"Custom entity: {tag_name}"
+                wikidata_description=f"Custom entity: {tag_name}",
+                is_interest=False,
             )
 
 
@@ -281,15 +333,15 @@ class TagMatcher:
 
     def calculate_priority(
         self,
-        content_tags: List[InterestTag],
+        content_tags: List[UnifiedNode],
         user_interests: List[UnifiedNode],
         content_text: str = "",
-        decay_factor: float = 0.9
+        decay_factor: float = 0.9,
     ) -> int:
         """Calculate priority based on tag matching with cross-domain detection.
 
         Args:
-            content_tags: Tags extracted from content
+            content_tags: Tags extracted from content (as UnifiedNodes)
             user_interests: User's tracked interests (UnifiedNodes)
             content_text: Full content text for domain detection
             decay_factor: Decay factor for non-exact matches
@@ -321,13 +373,22 @@ class TagMatcher:
                 score = interest.interest_level * interest.interest_priority / 10.0
             # Cross-domain match
             elif detected_domains:
-                score = self._cross_domain_match(interest, detected_domains, decay_factor)
+                score = self._cross_domain_match(
+                    interest, detected_domains, decay_factor
+                )
             # Fuzzy match (substring)
             else:
                 for content_tag in content_tags:
-                    if (content_tag.name in interest.name or
-                        interest.name in content_tag.name):
-                        score = interest.interest_level * decay_factor * interest.interest_priority / 10.0
+                    if (
+                        content_tag.name in interest.name
+                        or interest.name in content_tag.name
+                    ):
+                        score = (
+                            interest.interest_level
+                            * decay_factor
+                            * interest.interest_priority
+                            / 10.0
+                        )
                         break
 
             max_match_score = max(max_match_score, score)
@@ -336,10 +397,7 @@ class TagMatcher:
         return min(5, int(max_match_score * 5))
 
     def _cross_domain_match(
-        self,
-        interest: UnifiedNode,
-        detected_domains: List[Dict],
-        decay_factor: float
+        self, interest: UnifiedNode, detected_domains: List[Dict], decay_factor: float
     ) -> float:
         """Calculate cross-domain match score.
 
@@ -352,7 +410,8 @@ class TagMatcher:
             Match score from 0.0 to 1.0
         """
         interest_name_lower = interest.name.lower()
-        interest_category_lower = interest.category.value if hasattr(interest.category, 'value') else str(interest.category)
+        cat = interest.category
+        interest_category_lower = cat.value if hasattr(cat, "value") else str(cat)
 
         # Check if any detected domain matches the interest's category
         for domain_info in detected_domains:
@@ -367,20 +426,31 @@ class TagMatcher:
 
             # If interest's category is a cross-domain parent
             if interest_category_lower in cross_parents:
-                return interest.interest_level * interest.interest_priority / 6.0 * domain_info["score"]
+                return (
+                    interest.interest_level
+                    * interest.interest_priority
+                    / 6.0
+                    * domain_info["score"]
+                )
 
             # Check cross-domain relationship via Wu-Palmer similarity
             for cross_parent in cross_parents:
-                cross_score = calculate_cross_domain_score(interest_name_lower, cross_parent.lower())
+                cross_score = calculate_cross_domain_score(
+                    interest_name_lower, cross_parent.lower()
+                )
                 if cross_score > 0.3:
-                    return interest.interest_level * cross_score * interest.interest_priority / 5.0 * domain_info["score"]
+                    return (
+                        interest.interest_level
+                        * cross_score
+                        * interest.interest_priority
+                        / 5.0
+                        * domain_info["score"]
+                    )
 
         return 0.0
 
     def detect_cross_domain_tags(
-        self,
-        content_text: str,
-        base_categories: List[str]
+        self, content_text: str, base_categories: List[str]
     ) -> List[Dict]:
         """Detect cross-domain concepts in content.
 
@@ -406,22 +476,24 @@ class TagMatcher:
 
             # Only include cross-domain domains (level >= 2)
             if info.get("level", 0) >= 2:
-                cross_domain_tags.append({
-                    "domain": domain,
-                    "level": info.get("level", 0),
-                    "description": info.get("description", ""),
-                    "matches": domain_info.get("matches", []),
-                    "score": domain_info.get("score", 0.0),
-                    "cross_domains": info.get("cross_domains", []),
-                })
+                cross_domain_tags.append(
+                    {
+                        "domain": domain,
+                        "level": info.get("level", 0),
+                        "description": info.get("description", ""),
+                        "matches": domain_info.get("matches", []),
+                        "score": domain_info.get("score", 0.0),
+                        "cross_domains": info.get("cross_domains", []),
+                    }
+                )
 
         return cross_domain_tags
 
     def find_matching_interests(
         self,
-        content_tags: List[InterestTag],
+        content_tags: List[UnifiedNode],
         user_interests: List[UnifiedNode],
-        content_text: str = ""
+        content_text: str = "",
     ) -> List[Dict[str, Any]]:
         """Find matching user interests for content tags with cross-domain support.
 
@@ -453,7 +525,9 @@ class TagMatcher:
                     match_score = 0.5
                 # Cross-domain match
                 elif cross_domain_tags:
-                    cross_score = self._cross_domain_match(interest, cross_domain_tags, 0.9)
+                    cross_score = self._cross_domain_match(
+                        interest, cross_domain_tags, 0.9
+                    )
                     if cross_score > 0:
                         match_score = cross_score
                         match_type = "cross_domain"
@@ -463,12 +537,14 @@ class TagMatcher:
                     match_type = "related"
 
                 if match_score > 0:
-                    matches.append({
-                        "content_tag": content_tag,
-                        "user_interest": interest,
-                        "match_score": match_score * interest.interest_level,
-                        "match_type": match_type,
-                    })
+                    matches.append(
+                        {
+                            "content_tag": content_tag,
+                            "user_interest": interest,
+                            "match_score": match_score * interest.interest_level,
+                            "match_type": match_type,
+                        }
+                    )
 
         return sorted(matches, key=lambda x: x["match_score"], reverse=True)
 

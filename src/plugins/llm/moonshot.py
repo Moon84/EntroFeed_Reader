@@ -32,23 +32,22 @@ class MoonshotLLMHandler(ModelWrapperBase, LLMHandler):
         start_time = self._last_call_start = self._get_time()
         try:
             completion = client.chat.completions.create(
-                messages=messages,
-                model=self.model,
-                **kwargs
+                messages=messages, model=self.model, **kwargs
             )
-            
+
             # Extract usage info for metrics
             usage = completion.usage
             input_tokens = getattr(usage, "prompt_tokens", 0)
             output_tokens = getattr(usage, "completion_tokens", 0)
-            
+
             if input_tokens or output_tokens:
                 record_token_usage(self.model, input_tokens, output_tokens)
-            
+
             duration = self._get_time() - start_time
             record_llm_request(self.id, self.model, True, duration)
-            
-            return completion.choices[0].message.content
+
+            content = completion.choices[0].message.content
+            return content if content is not None else ""
         except Exception:
             duration = self._get_time() - start_time
             record_llm_request(self.id, self.model, False, duration)
@@ -58,12 +57,13 @@ class MoonshotLLMHandler(ModelWrapperBase, LLMHandler):
         """Summarize content using Moonshot/Kimi."""
         return self._make_chat_call(
             system=self.summarization_system_prompt,
-            prompt=self.get_summarization_prompt(mk)
+            prompt=self.get_summarization_prompt(mk),
         )
 
     def _get_time(self) -> float:
         """Get current time for metrics."""
         import time
+
         return time.time()
 
 

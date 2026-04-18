@@ -3,7 +3,6 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
 
 from src.services.recommendation import (
     SimilarRecommender,
@@ -18,7 +17,6 @@ from src.services.ontology.types import (
     UnifiedNode,
     ContentProfile,
     InterestCategory,
-    TagSource,
 )
 
 
@@ -481,11 +479,11 @@ class TestInterestBasedRecommender:
         tags = recommender._convert_entry_tags(entry)
 
         assert len(tags) == 2
-        assert all(isinstance(t, InterestTag) for t in tags)
+        assert all(isinstance(t, UnifiedNode) for t in tags)
 
     def test_calculate_interest_score(self, recommender):
         """Test _calculate_interest_score method."""
-        tag = InterestTag(
+        tag = UnifiedNode(
             name="AI", category=InterestCategory.TECHNOLOGY, confidence=0.9
         )
         profile = ContentProfile(

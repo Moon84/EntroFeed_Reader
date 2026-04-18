@@ -5,7 +5,7 @@ from logging import getLogger
 from pathlib import Path
 from re import sub as re_sub
 from tempfile import SpooledTemporaryFile
-from typing import List, Mapping, Dict, Any
+from typing import List, Mapping, Dict, Any, Optional
 
 from opml import OpmlDocument, OpmlOutline
 from ruamel.yaml import YAML
@@ -19,8 +19,8 @@ logger = getLogger("uvicorn.error")
 
 def _score_and_tag_entry(
     entry_data: Dict[str, Any],
-    feed_entry: FeedEntry = None,
-    feed: Feed = None
+    feed_entry: Optional[FeedEntry] = None,
+    feed: Optional[Feed] = None
 ) -> Dict[str, Any]:
     """
     为条目评分和打标签（统一流程）
@@ -59,23 +59,23 @@ def _score_and_tag_entry(
         if feed_entry is not None and feed is not None:
             try:
                 ontology = get_ontology_registry()
-                content = entry_data.get("content") or entry_data.get("summary")
                 # 创建 ContentProfile 用于存储
-                from src.services.ontology.types import ContentProfile, InterestTag, TagSource
+                from src.services.ontology.types import ContentProfile, TagSource
                 profile_tags = []
                 for t in extracted_tags:
                     if isinstance(t, dict):
-                        from src.services.ontology.types import InterestCategory
+                        from src.services.ontology.types import InterestCategory, UnifiedNode
                         cat_str = t.get("category", "other")
                         try:
                             cat = InterestCategory(cat_str)
                         except ValueError:
                             cat = InterestCategory.OTHER
-                        profile_tags.append(InterestTag(
+                        profile_tags.append(UnifiedNode(
                             name=t.get("name", ""),
                             category=cat,
                             confidence=t.get("confidence", 0.5),
                             source=TagSource.RSS if t.get("is_rss_tag") else TagSource.RULE,
+                            is_interest=False,
                         ))
                 profile = ContentProfile(
                     entry_id=feed_entry.id,
@@ -157,7 +157,7 @@ class EntroFeedRSS:
         content = "".join(i.get("value", "") for i in entry.get("content", []))
 
         # Clean arXiv summary pollution
-        summary = entry.summary or ""
+        summary = getattr(entry, "summary", None) or entry.get("summary") or ""
         if summary.startswith("arXiv:"):
             # Remove arXiv header pollution: "arXiv:XXXXvN Announce Type: new\nAbstract: ..."
             summary = re_sub(r"^arXiv:\S+\s+Announce Type: \w+\s+Abstract:\s*", "", summary)
@@ -166,17 +166,22 @@ class EntroFeedRSS:
         # Capture RSS category tags (feedparser tags field)
         rss_tags = [t.get("term", "") for t in entry.get("tags", []) if t.get("term")]
 
+        # Use getattr for feedparser entries that have attribute access
+        entry_title = getattr(entry, "title", None) or entry.get("title", "")
+        entry_link = getattr(entry, "link", None) or entry.get("link", "")
+        entry_authors = getattr(entry, "authors", None) or entry.get("authors", [])
+
         feed_entry = FeedEntry(
             **{
-                "title": entry.title,
-                "url": entry.link,
+                "title": entry_title,
+                "url": entry_link,
                 "published_at": published_time,
                 "updated_at": _get_entry_time(entry),
                 "preview": summary,
                 "content": content if content != "" else None,
                 "feed_id": feed.id,
                 "authors": (
-                    [i.get("name", "") for i in entry.authors] if "authors" in entry else []
+                    [i.get("name", "") for i in entry_authors if isinstance(i, dict)]
                 ),
             }
         )
@@ -186,13 +191,13 @@ class EntroFeedRSS:
         ) and not self.db.feed_entry_exists(feed_entry.id):
             # 准备条目数据用于评分和打标签
             entry_data = {
-                "title": entry.title,
+                "title": entry_title,
                 "summary": summary,
                 "source": feed.url,
                 "source_name": feed.name,
                 "rss_tags": rss_tags,
                 "published_at": published_time,
-                "url": entry.link,
+                "url": entry_link,
                 "content": content if content != "" else None,
             }
             # 评分和打标签（通过 ontology registry 处理）
@@ -273,37 +278,42 @@ class EntroFeedRSS:
         published_time = _get_entry_time(entry)
         content = "".join(i.get("value", "") for i in entry.get("content", []))
 
-        summary = entry.summary or ""
+        summary = entry.get("summary") or ""
         if summary.startswith("arXiv:"):
             summary = re_sub(r"^arXiv:\S+\s+Announce Type: \w+\s+Abstract:\s*", "", summary)
             summary = re_sub(r"^arXiv:\S+\s*", "", summary)
 
         rss_tags = [t.get("term", "") for t in entry.get("tags", []) if t.get("term")]
 
+        # Use getattr for feedparser entries that have attribute access
+        entry_title = getattr(entry, "title", None) or entry.get("title", "")
+        entry_link = getattr(entry, "link", None) or entry.get("link", "")
+        entry_authors = getattr(entry, "authors", None) or entry.get("authors", [])
+
         feed_entry = FeedEntry(
             **{
-                "title": entry.title,
-                "url": entry.link,
+                "title": entry_title,
+                "url": entry_link,
                 "published_at": published_time,
                 "updated_at": _get_entry_time(entry),
                 "preview": summary,
                 "content": content if content != "" else None,
                 "feed_id": feed.id,
                 "authors": (
-                    [i.get("name", "") for i in entry.authors] if "authors" in entry else []
+                    [i.get("name", "") for i in entry_authors if isinstance(i, dict)]
                 ),
             }
         )
 
         if published_time >= (start_ts if start_ts else 0) and not self.db.feed_entry_exists(feed_entry.id):
             entry_data = {
-                "title": entry.title,
+                "title": entry_title,
                 "summary": summary,
                 "source": feed.url,
                 "source_name": feed.name,
                 "rss_tags": rss_tags,
                 "published_at": published_time,
-                "url": entry.link,
+                "url": entry_link,
                 "content": content if content != "" else None,
             }
             scored_entry = _score_and_tag_entry(entry_data, feed_entry=feed_entry, feed=feed)
@@ -338,20 +348,20 @@ class EntroFeedRSS:
         now = int(datetime.now(tz=timezone.utc).timestamp())
         logger.info(f"Checking feeds starting at time {now}")
 
-        for feed in self.db.get_feeds():
-            feed: Feed
-            if feed.refresh_enabled:
-                await self._check_feed(feed=feed)
+        for _feed in self.db.get_feeds():
+            if _feed.refresh_enabled:
+                await self._check_feed(feed=_feed)
+        return []
 
     def check_feeds_sync(self) -> List:
         """Synchronous version of check_feeds for use in thread pool."""
         now = int(datetime.now(tz=timezone.utc).timestamp())
         logger.info(f"Checking feeds (sync) starting at time {now}")
 
-        for feed in self.db.get_feeds():
-            feed: Feed
-            if feed.refresh_enabled:
-                self._check_feed_sync(feed=feed)
+        for _feed in self.db.get_feeds():
+            if _feed.refresh_enabled:
+                self._check_feed_sync(feed=_feed)
+        return []
 
     async def check_feed_by_id(self, id: str) -> List:
         feed = self.db.get_feed(id=id)
@@ -359,6 +369,7 @@ class EntroFeedRSS:
         logger.info(f"Manual refresh requested for feed {feed.name}")
 
         await self._check_feed(feed=feed)
+        return []
 
     async def add_feed_entry(self, feed: Feed, entry: FeedEntry) -> None:
         logger.info(f"Upserting entry from {feed.name}: {entry.title} - id {entry.id}")
@@ -382,7 +393,8 @@ class EntroFeedRSS:
 
     @staticmethod
     async def get_entry_html(url: str, settings: GlobalSettings) -> str:
-        return await settings.content_retrieval_handler.get_content(url)
+        # Get HTML content directly for a URL
+        return await settings.content_retrieval_handler.get_html(url=url, use_script=False)
 
     async def feeds_to_opml(self) -> OpmlDocument:
         feeds = self.db.get_feeds()
@@ -393,9 +405,8 @@ class EntroFeedRSS:
             date_modified=datetime.now(),
         )
 
-        for feed in feeds:
-            feed: Feed
-            opml.add_rss(text=feed.name, xml_url=feed.url, categories=[feed.category])
+        for _feed in feeds:
+            opml.add_rss(text=_feed.name, xml_url=_feed.url, categories=[_feed.category])
 
         str_now = datetime.now().strftime("%Y%m%d%H%M%S")
         file_name = f"entrofeed_{str_now}.opml"

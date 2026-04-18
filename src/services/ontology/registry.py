@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Any, Callable
 from .memory import OntologyMemory
 from .types import (
     UnifiedNode,
-    InterestTag,
     ContentProfile,
     InterestCategory,
     TagSource,
@@ -135,7 +134,7 @@ class OntologyRegistry:
 
     def get_user_interests(
         self,
-        category: InterestCategory = None
+        category: Optional[InterestCategory] = None
     ) -> List[UnifiedNode]:
         """Get user interests.
 
@@ -152,24 +151,37 @@ class OntologyRegistry:
 
     def add_interest(
         self,
-        tag: InterestTag,
-        priority: int = 3
+        name: str,
+        category: InterestCategory = InterestCategory.OTHER,
+        priority: int = 3,
+        confidence: float = 0.8,
+        wikidata_qid: Optional[str] = None,
+        **kwargs
     ) -> UnifiedNode:
         """Add explicit user interest.
 
         Args:
-            tag: Interest tag
+            name: Interest name
+            category: Interest category
             priority: Initial priority (0-5)
+            confidence: Confidence score
+            wikidata_qid: Optional Wikidata QID
+            **kwargs: Additional UnifiedNode fields
 
         Returns:
             Created UnifiedNode with is_interest=True
         """
-        # Convert to unified node
-        node = UnifiedNode.from_interest_tag(tag)
-        node.is_interest = True
-        node.interest_priority = priority
-        node.interest_level = 0.8 if tag.source == TagSource.EXPLICIT else 0.3
-        node.source = TagSource.EXPLICIT
+        node = UnifiedNode(
+            name=name,
+            category=category,
+            confidence=confidence,
+            source=TagSource.EXPLICIT,
+            wikidata_qid=wikidata_qid,
+            is_interest=True,
+            interest_priority=priority,
+            interest_level=0.8,
+            **kwargs
+        )
 
         self.memory.save_node(node)
         return node
@@ -462,7 +474,10 @@ If no clear entities found, return []."""
 
         try:
             response = llm.chat([
-                {"role": "system", "content": "You are a precise entity extraction assistant. Output only valid JSON array."},
+                {
+                    "role": "system",
+                    "content": "You are a precise entity extraction assistant. Output only valid JSON array."
+                },
                 {"role": "user", "content": prompt}
             ])
 
@@ -478,32 +493,17 @@ If no clear entities found, return []."""
             if not isinstance(entities, list):
                 return
 
-            # Convert to InterestTags
-            from src.services.ontology.types import InterestTag, TagSource, InterestCategory
-
-            category_map = {
-                "technology": InterestCategory.TECHNOLOGY,
-                "medical": InterestCategory.MEDICAL,
-                "finance": InterestCategory.FINANCE,
-                "science": InterestCategory.SCIENCE,
-                "business": InterestCategory.BUSINESS,
-                "education": InterestCategory.EDUCATION,
-                "entertainment": InterestCategory.ENTERTAINMENT,
-                "sports": InterestCategory.SPORTS,
-                "politics": InterestCategory.POLITICS,
-                "society": InterestCategory.SOCIETY,
-                "other": InterestCategory.OTHER,
-            }
+            # Convert to UnifiedNodes
+            from .types import InterestCategory
 
             tags = []
             for e in entities:
                 name = e.get("name", "").lower().strip()
                 if not name or len(name) < 2:
                     continue
-                cat_str = e.get("category", "other").lower()
-                tag = InterestTag(
+                tag = UnifiedNode(
                     name=name,
-                    category=category_map.get(cat_str, InterestCategory.OTHER),
+                    category=InterestCategory.BUSINESS,
                     confidence=0.7,
                     source=TagSource.BEHAVIOR,
                 )
@@ -542,7 +542,7 @@ If no clear entities found, return []."""
         self,
         max_new: int = 5,
         min_confidence: float = 0.3
-    ) -> List[InterestTag]:
+    ) -> List[UnifiedNode]:
         """Infer new interests from reading history.
 
         Args:
@@ -550,7 +550,7 @@ If no clear entities found, return []."""
             min_confidence: Minimum confidence threshold
 
         Returns:
-            List of inferred InterestTags
+            List of inferred UnifiedNodes
         """
         # Get recent profiles
         recent = self.memory.get_recent_profiles(limit=50)
@@ -567,20 +567,24 @@ If no clear entities found, return []."""
 
     def accept_inferred_interest(
         self,
-        tag: InterestTag,
+        node: UnifiedNode,
         priority: int = 2
     ) -> UnifiedNode:
         """Accept an inferred interest as explicit.
 
         Args:
-            tag: Inferred tag to accept
+            node: Inferred UnifiedNode to accept
             priority: Initial priority
 
         Returns:
             UnifiedNode with is_interest=True
         """
-        tag.source = TagSource.EXPLICIT
-        return self.add_interest(tag, priority)
+        node.source = TagSource.EXPLICIT
+        node.is_interest = True
+        node.interest_priority = priority
+        node.interest_level = 0.8
+        self.memory.save_node(node)
+        return node
 
     # ============ Content Search ============
 
@@ -702,7 +706,7 @@ If no clear entities found, return []."""
         # Create and save UnifiedNode objects (is_interest=True)
         created = []
         for item in extracted:
-            tag = InterestTag(
+            node = UnifiedNode(
                 name=item["name"].lower().strip(),
                 category=self._map_to_interest_category(item.get("category", "other")),
                 confidence=item.get("confidence", 0.7),
@@ -710,10 +714,13 @@ If no clear entities found, return []."""
                 wikidata_qid=item.get("wikidata_qid"),
                 wikidata_label=item.get("wikidata_label"),
                 wikidata_description=item.get("wikidata_description"),
-                synonyms=item.get("synonyms", [])
+                synonyms=item.get("synonyms", []),
+                is_interest=True,
+                interest_priority=item.get("priority", 3),
+                interest_level=0.8,
             )
-            interest = self.add_interest(tag, priority=item.get("priority", 3))
-            created.append(interest)
+            self.memory.save_node(node)
+            created.append(node)
 
         return created
 
@@ -988,7 +995,7 @@ Return ONLY valid JSON array, no markdown formatting, no other text. If no clear
 
         created = []
         for item in extracted:
-            tag = InterestTag(
+            node = UnifiedNode(
                 name=item["name"].lower().strip(),
                 category=self._map_to_interest_category(item.get("category", "other")),
                 confidence=item.get("confidence", 0.7),
@@ -996,10 +1003,13 @@ Return ONLY valid JSON array, no markdown formatting, no other text. If no clear
                 wikidata_qid=item.get("wikidata_qid"),
                 wikidata_label=item.get("wikidata_label"),
                 wikidata_description=item.get("wikidata_description"),
-                synonyms=item.get("synonyms", [])
+                synonyms=item.get("synonyms", []),
+                is_interest=True,
+                interest_priority=item.get("priority", 3),
+                interest_level=0.8,
             )
-            interest = self.add_interest(tag, priority=item.get("priority", 3))
-            created.append(interest)
+            self.memory.save_node(node)
+            created.append(node)
 
         return created
 

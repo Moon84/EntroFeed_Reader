@@ -566,10 +566,7 @@ def calculate_cross_domain_score(domain1: str, domain2: str) -> float:
     if not lca:
         return 0.0
 
-    # Wu-Palmer similarity
-    depth_lca = len(path1) + len(path2) - 2 * (len(path1) - path1.index(lca) - 1)
-    # Simplified: depth_lca = position in path1 + position in path2
-
+    # Wu-Palmer similarity calculation
     lca_index1 = path1.index(lca)
     lca_index2 = path2.index(lca)
     depth_sum = (len(path1) - lca_index1) + (len(path2) - lca_index2)

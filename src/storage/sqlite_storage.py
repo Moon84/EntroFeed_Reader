@@ -289,7 +289,8 @@ class SQLiteStorageHandler(StorageHandler):
 
         cursor.execute("""
             INSERT OR REPLACE INTO feed_entries
-            (id, feed_id, title, url, published_at, updated_at, content, authors, preview, created_at, updated_at_entry, is_read, read_at, liked, is_favorite)
+            (id, feed_id, title, url, published_at, updated_at, content, authors, preview,
+             created_at, updated_at_entry, is_read, read_at, liked, is_favorite)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             entry.id, entry.feed_id, entry.title, entry.url,

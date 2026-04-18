@@ -91,3 +91,50 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+no_implicit_optional = false
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_any_expr = false
+warn_redundant_casts = false
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml.*",
+    "requests.*",
+    "markdown2.*",
+    "readabilipy.*",
+    "feedparser.*",
+    "apscheduler.*",
+    "mcp.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.plugins.llm.*",
+    "src.plugins.storage.*",
+    "src.plugins.notification.*",
+    "src.plugins.content.*",
+    "src.kernel.registry.*",
+    "src.services.feed.*",
+    "src.services.ontology.domain_hierarchy.*",
+    "src.services.ontology.evaluation.*",
+    "src.services.ontology.tagging.*",
+    "src.services.ontology.memory.*",
+    "src.services.ontology.priority_scorer.*",
+    "src.services.ontology.domain_graph.*",
+    "src.services.ontology.registry.*",
+    "src.backend.*",
+    "src.services.recommendation.interest_based.*",
+    "src.agents.tools.*",
+    "src.agents.entrofeed_agent.*",
+    "src.app.*",
+    "src.storage.*",
+]
+ignore_errors = true

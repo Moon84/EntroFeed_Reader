@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests for Content Retrieval Plugins."""
 
-import pytest
-from unittest.mock import patch, AsyncMock
 
 from src.plugins.content import (
-    ContentPluginBase,
     ContentPluginRegistry,
     RequestsContentRetriever,
     PlaywrightContentRetriever,

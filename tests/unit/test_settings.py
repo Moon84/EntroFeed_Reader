@@ -1,6 +1,4 @@
-from enum import Enum
 
-import pytest
 
 from src.settings import GlobalSettings, Themes
 

@@ -12,7 +12,7 @@ import pytest
 import time
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from src.services.ontology.wikidata import WikidataResolver
 from src.services.ontology.domain_graph import DomainGraph
@@ -20,8 +20,6 @@ from src.services.ontology.memory import OntologyMemory
 from src.services.ontology.types import (
     InterestTag,
     UnifiedNode,
-    OntologyNode,
-    OntologyRelation,
     InterestCategory,
     TagSource,
 )
@@ -234,9 +232,8 @@ class TestDomainGraph:
 
     def test_graph_coefficient_exact(self, graph):
         """Test graph coefficient for exact match."""
-        # Add two nodes
+        # Add a node
         qid1 = graph._create_custom_entity("concept1")
-        qid2 = graph._create_custom_entity("concept2")
 
         # Exact match (same QID)
         result = graph.calculate_graph_coefficient([qid1], [qid1])

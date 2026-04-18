@@ -18,25 +18,25 @@ def convert_png_to_svg(input_path: str, output_path: str, size: int = None):
 
     # Load image and convert to grayscale
     img = Image.open(input_file).convert('L')
-    
+
     # Resize if needed
     if size:
         img = img.resize((size, size), Image.Resampling.LANCZOS)
-    
+
     with tempfile.NamedTemporaryFile(suffix='.pnm', delete=False) as tmp:
         tmp_path = tmp.name
         # Save as PNM (P5 = grayscale PPM)
         img.save(tmp_path, format='PPM')
-    
+
     # Run potrace
     result = subprocess.run(
         ['potrace', '-s', '-b', 'svg', '-o', str(output_file), '--tight', tmp_path],
         capture_output=True,
         text=True
     )
-    
+
     Path(tmp_path).unlink()
-    
+
     if result.returncode != 0:
         print(f"Error: {result.stderr}")
         return False

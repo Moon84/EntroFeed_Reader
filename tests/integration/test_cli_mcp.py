@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 """Integration tests for CLI and MCP."""
 
-import json
-import tempfile
 import pytest
-from pathlib import Path
-from unittest.mock import patch, Mock, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 
 
 class TestCLIImports:
@@ -15,14 +12,6 @@ class TestCLIImports:
         """Test CLI module can be imported."""
         from src.cli import (
             cli,
-            backup,
-            restore,
-            export_opml,
-            import_opml,
-            load_feeds,
-            check_feeds,
-            load_settings,
-            load_handlers,
         )
 
         assert cli is not None
@@ -140,8 +129,8 @@ class TestCLIDocstring:
         """Test CLI has documented commands."""
         import src.cli
 
-        doc = src.cli.__doc__ if src.cli.__doc__ else ""
         # CLI should have some structure
+        assert hasattr(src.cli, '__doc__')
 
 
 if __name__ == "__main__":

@@ -193,7 +193,8 @@ async def get_feed_stats():
 
             # Unread count
             cursor.execute(
-                "SELECT COUNT(*) FROM feed_entries WHERE feed_id = ? AND published_at > ? AND (is_read = 0 OR is_read IS NULL)",
+                "SELECT COUNT(*) FROM feed_entries WHERE feed_id = ? AND published_at > ? "
+                "AND (is_read = 0 OR is_read IS NULL)",
                 (feed_id, cutoff_time)
             )
             unread_count = cursor.fetchone()[0]
@@ -213,7 +214,7 @@ async def get_feed_stats():
 
 @app.get("/util/list-feed-entries")
 async def list_feed_entries(
-    feed_id: str = None,
+    feed_id: Optional[str] = None,
     liked: int = 0,
     is_favorite: bool = False,
 ) -> Sequence[Mapping]:
@@ -273,7 +274,7 @@ async def update_feed(
     url: Annotated[str, Form()],
     category: Annotated[str, Form()],
     request: Request,
-    notify_destination: Annotated[str, Form()] = None,
+    notify_destination: Annotated[Optional[str], Form()] = None,
     notify: Annotated[bool, Form()] = False,
     preview_only: Annotated[bool, Form()] = False,
     refresh_enabled: Annotated[bool, Form()] = False,
@@ -388,7 +389,7 @@ async def backup():
 @app.post("/api/restore/", status_code=status.HTTP_200_OK)
 async def restore(request: Request, file: UploadFile):
     try:
-        await rss.restore(file=file.file)
+        await rss.restore(file=file.file)  # type: ignore[arg-type]
         return {"status": "ok", "message": "Restore successful"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -397,7 +398,7 @@ async def restore(request: Request, file: UploadFile):
 @app.post("/api/import_opml/", status_code=status.HTTP_200_OK)
 async def import_opml(request: Request, file: UploadFile):
     try:
-        await rss.opml_to_feeds(file=file.file)
+        await rss.opml_to_feeds(file=file.file)  # type: ignore[arg-type]
         return {"status": "ok", "message": "Import successful"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -451,7 +452,7 @@ async def get_similar_recommendations_api(entry_id: str, limit: int = 5):
 # =============================================================================
 
 @app.get("/api/interests")
-async def list_interests(category: str = None):
+async def list_interests(category: Optional[str] = None):
     from src.services.ontology import get_ontology_registry
     from src.services.ontology.types import InterestCategory
 
@@ -470,7 +471,7 @@ async def list_interests(category: str = None):
 @app.post("/api/interests")
 async def add_interest(name: str, category: str = "other", priority: int = 3):
     from src.services.ontology import get_ontology_registry
-    from src.services.ontology.types import InterestTag, InterestCategory, TagSource
+    from src.services.ontology.types import InterestCategory
 
     registry = get_ontology_registry()
     try:
@@ -478,13 +479,12 @@ async def add_interest(name: str, category: str = "other", priority: int = 3):
     except ValueError:
         cat = InterestCategory.OTHER
 
-    tag = InterestTag(
+    interest = registry.add_interest(
         name=name.lower(),
         category=cat,
-        source=TagSource.EXPLICIT,
+        priority=priority,
         confidence=1.0
     )
-    interest = registry.add_interest(tag, priority)
     return {"interest": interest.to_dict()}
 
 
@@ -497,7 +497,7 @@ async def remove_interest(interest_id: str):
 
 
 @app.patch("/api/interests/{interest_id}")
-async def update_interest(interest_id: str, priority: int = None):
+async def update_interest(interest_id: str, priority: Optional[int] = None):
     from src.services.ontology import get_ontology_registry
     registry = get_ontology_registry()
     if priority is not None:
@@ -518,16 +518,16 @@ async def get_inferred_interests(limit: int = 5):
 @app.post("/api/interests/inferred/{tag}")
 async def accept_inferred_interest(tag: str, priority: int = 2):
     from src.services.ontology import get_ontology_registry
-    from src.services.ontology.types import InterestTag, InterestCategory, TagSource
+    from src.services.ontology.types import UnifiedNode, InterestCategory, TagSource
 
     registry = get_ontology_registry()
-    interest_tag = InterestTag(
+    node = UnifiedNode(
         name=tag.lower(),
         category=InterestCategory.OTHER,
-        source=TagSource.EXPLICIT,
-        confidence=1.0
+        source=TagSource.INFERENCE,
+        confidence=1.0,
     )
-    interest = registry.accept_inferred_interest(interest_tag, priority)
+    interest = registry.accept_inferred_interest(node, priority)
     return {"interest": interest.to_dict()}
 
 
@@ -812,7 +812,8 @@ Always provide specific, accurate information from the tools."""
             # Execute tool calls
             for tc in tool_calls:
                 func_name = tc["function"]["name"]
-                func_args = json.loads(tc["function"]["arguments"]) if isinstance(tc["function"]["arguments"], str) else tc["function"]["arguments"]
+                args_str = tc["function"]["arguments"]
+                func_args = json.loads(args_str) if isinstance(args_str, str) else args_str
                 tool_id = tc["id"]
 
                 if func_name in TOOL_FUNCTIONS:
@@ -972,22 +973,22 @@ async def llm_providers():
     from src.plugins.llm import (
         LLMPluginRegistry, MODEL_CATALOG, _get_provider_display_name
     )
-    
+
     providers = []
     for provider_id in LLMPluginRegistry.list_handlers():
         # Skip internal handlers
         if provider_id in ("dummy_llm", "null_llm", "dashscope_vision"):
             continue
-            
+
         handler_cls = LLMPluginRegistry.get_handler(provider_id)
         if not handler_cls:
             continue
-            
+
         # Check availability
         required_env = getattr(handler_cls, "required_env", [])
         missing_env = [e for e in required_env if not os.getenv(e)]
         available = len(missing_env) == 0
-        
+
         # Get models for this provider
         models = MODEL_CATALOG.get_models_by_provider(provider_id)
         if not models:
@@ -1000,7 +1001,7 @@ async def llm_providers():
                 "description": f"{_get_provider_display_name(provider_id)} model",
                 "pricing_hint": "",
             }]
-        
+
         providers.append({
             "id": provider_id,
             "name": _get_provider_display_name(provider_id),
@@ -1018,20 +1019,20 @@ async def llm_providers():
                 for m in models
             ],
         })
-    
+
     return {"providers": providers}
 
 
 @app.get("/api/llm/models")
-async def llm_models(provider: str = None):
+async def llm_models(provider: Optional[str] = None):
     """Get models, optionally filtered by provider."""
     from src.plugins.llm import MODEL_CATALOG
-    
+
     if provider:
         models = MODEL_CATALOG.get_models_by_provider(provider)
     else:
         models = MODEL_CATALOG.get_all_models()
-    
+
     return {
         "models": [
             {

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for MCP server module."""
 
-import json
 import pytest
 from unittest.mock import Mock, patch
 
@@ -55,7 +54,7 @@ class TestMCPServerToolDefinitions:
             mock_storage.return_value = Mock()
             with patch("src.mcp.EntroFeedBackend") as mock_backend:
                 mock_backend.return_value = Mock()
-                server = create_mcp_server()
+                create_mcp_server()
                 return []
 
 

@@ -63,7 +63,6 @@ class SimilarRecommender:
         else:
             # Get entry info for fallback
             try:
-                from src.backend import EntroFeedBackend
                 from src.storage.singleton import get_storage
                 storage = get_storage()
                 entry = storage.get_feed_entry(entry_id)

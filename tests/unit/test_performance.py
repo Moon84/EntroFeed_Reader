@@ -152,7 +152,6 @@ class TestMemoryEfficiency:
         assert response.status_code == 200
         data = response.json()
         # Response should be under 1MB
-        import sys
 
         response_size = len(str(data))
         assert response_size < 1024 * 1024, f"Response too large: {response_size} bytes"

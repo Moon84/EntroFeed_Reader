@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Notification Plugins."""
 
-import pytest
 
 from src.plugins.notification import (
     NotificationPluginBase,

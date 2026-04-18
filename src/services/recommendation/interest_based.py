@@ -157,7 +157,7 @@ class InterestBasedRecommender:
         return recommendations
 
     def _convert_entry_tags(self, entry) -> List[InterestTag]:
-        """Convert raw entry tags to InterestTag list."""
+        """Convert raw entry tags to UnifiedNode list."""
         entry_tags = []
         if entry.tags:
             for t in entry.tags:
@@ -166,11 +166,12 @@ class InterestBasedRecommender:
                         cat = InterestCategory(t.get("category", "other"))
                     except ValueError:
                         cat = InterestCategory.OTHER
-                    entry_tags.append(InterestTag(
+                    entry_tags.append(UnifiedNode(
                         name=t.get("name", "").lower(),
                         category=cat,
                         confidence=t.get("confidence", 0.5),
-                        source=TagSource.INFERENCE
+                        source=TagSource.INFERENCE,
+                        is_interest=False,
                     ))
         return entry_tags
 
@@ -202,7 +203,6 @@ class InterestBasedRecommender:
             tag_name = interest.name
             tag_category = interest.category
             tag_score = 0.0
-            match_type = "exact"
 
             # Exact tag name match (highest weight)
             if tag_name.lower() in profile_tag_names:
@@ -219,7 +219,6 @@ class InterestBasedRecommender:
                 )
                 if cross_score > 0:
                     tag_score = cross_score
-                    match_type = "cross_domain"
             # Fuzzy match (lower weight)
             else:
                 for pt in profile.tags:
@@ -340,7 +339,6 @@ class InterestBasedRecommender:
             tag_name = interest.name
             tag_category = interest.category
             tag_score = 0.0
-            match_type = "exact"
 
             # Exact tag name match (highest weight)
             if tag_name.lower() in entry_tag_names:
@@ -357,13 +355,11 @@ class InterestBasedRecommender:
                 )
                 if cross_score > 0:
                     tag_score = cross_score
-                    match_type = "cross_domain"
             # Fuzzy match (lower weight)
             else:
                 for pt in entry_tags:
                     if tag_name.lower() in pt.name.lower() or pt.name.lower() in tag_name.lower():
                         tag_score = 0.3
-                        match_type = "fuzzy"
                         break
 
             if tag_score > 0:

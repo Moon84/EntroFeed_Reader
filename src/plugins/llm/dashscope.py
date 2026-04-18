@@ -31,11 +31,14 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
     def _check_api_connectivity(cls) -> bool:
         """Check if DashScope API is reachable."""
         import requests
+
         try:
             resp = requests.get(
                 "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
                 timeout=5,
-                headers={"Authorization": f"Bearer {os.getenv('DASHSCOPE_API_KEY', '')}"}
+                headers={
+                    "Authorization": f"Bearer {os.getenv('DASHSCOPE_API_KEY', '')}"
+                },
             )
             return resp.status_code in (200, 401)
         except requests.RequestException:
@@ -59,16 +62,19 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
                 messages=messages,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                **kwargs
+                **kwargs,
             )
-            
+
             # Record metrics
             usage = response.usage
             if usage:
-                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+                record_token_usage(
+                    self.model, usage.prompt_tokens, usage.completion_tokens
+                )
             record_llm_request(self.id, self.model, True, time.time() - start_time)
-            
-            return response.choices[0].message.content
+
+            content = response.choices[0].message.content
+            return content if content is not None else ""
         except Exception:
             record_llm_request(self.id, self.model, False, time.time() - start_time)
             raise
@@ -77,15 +83,11 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
         """Summarize content using DashScope."""
         system = self.system if self.system else self.summarization_system_prompt
         return self._make_chat_call(
-            system=system,
-            prompt=self.get_summarization_prompt(mk)
+            system=system, prompt=self.get_summarization_prompt(mk)
         )
 
     def chat_with_tools(
-        self,
-        messages: List[Dict[str, str]],
-        tools: List[Dict[str, Any]],
-        **kwargs
+        self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]], **kwargs
     ) -> Dict[str, Any]:
         """Chat with function calling support for DashScope."""
         api_key = self.api_key or os.getenv("DASHSCOPE_API_KEY")
@@ -97,15 +99,19 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
         # Convert tools to DashScope format
         dashscope_tools = []
         for tool in tools:
-            func = tool.get('function', {})
-            dashscope_tools.append({
-                "type": "function",
-                "function": {
-                    "name": func.get('name'),
-                    "description": func.get('description'),
-                    "parameters": func.get('parameters', {"type": "object", "properties": {}}),
+            func = tool.get("function", {})
+            dashscope_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": func.get("name"),
+                        "description": func.get("description"),
+                        "parameters": func.get(
+                            "parameters", {"type": "object", "properties": {}}
+                        ),
+                    },
                 }
-            })
+            )
 
         start_time = time.time()
         try:
@@ -116,13 +122,15 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
                 tool_choice="auto",
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                **kwargs
+                **kwargs,
             )
 
             # Record metrics
             usage = response.usage
             if usage:
-                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+                record_token_usage(
+                    self.model, usage.prompt_tokens, usage.completion_tokens
+                )
             record_llm_request(self.id, self.model, True, time.time() - start_time)
 
             message = response.choices[0].message
@@ -135,7 +143,7 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
                         "function": {
                             "name": tc.function.name,
                             "arguments": tc.function.arguments,
-                        }
+                        },
                     }
                     for tc in message.tool_calls
                 ]
@@ -167,29 +175,35 @@ class DashScopeVisionHandler(ModelWrapperBase, LLMHandler):
         start_time = time.time()
         try:
             response = client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                **kwargs
+                model=self.model, messages=messages, **kwargs
             )
 
             # Record metrics
             usage = response.usage
             if usage:
-                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+                record_token_usage(
+                    self.model, usage.prompt_tokens, usage.completion_tokens
+                )
             record_llm_request(self.id, self.model, True, time.time() - start_time)
 
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return content if content is not None else ""
         except Exception:
             record_llm_request(self.id, self.model, False, time.time() - start_time)
             raise
 
     def summarize(self, feed: Feed, entry: FeedEntry, mk: str) -> str:
         """Summarize/describe image using DashScope vision model."""
-        return self.chat([
-            {"role": "user", "content": [
-                {"type": "text", "text": self.get_summarization_prompt(mk)}
-            ]}
-        ])
+        return self.chat(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": self.get_summarization_prompt(mk)}
+                    ],
+                }
+            ]
+        )
 
 
 # Auto-register on import
