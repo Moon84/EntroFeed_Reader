@@ -30,7 +30,7 @@ jobs:
         working-directory: ${{ github.workspace }}
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: install
         run: |
           pip install uv
