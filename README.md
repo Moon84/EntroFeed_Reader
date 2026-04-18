@@ -46,13 +46,13 @@
 - Built-in AI chat powered by **AntDesign X**
 - Summarize, translate, and discuss articles with context
 - Attach articles to conversations for deep analysis
-- Multi-provider support: OpenAI, Ollama, DashScope
+- Multi-provider support: **8 LLM providers**
 
 ### Extensible Plugin Architecture
 
 | Plugin Type | Options |
 |-------------|---------|
-| **LLM Providers** | OpenAI, Ollama, DashScope |
+| **LLM Providers** | OpenAI, DeepSeek, Zhipu, Moonshot, Baichuan, Tencent, DashScope, Ollama |
 | **Content Retrieval** | requests, Playwright, RSShub |
 | **Storage** | SQLite + ChromaDB vector store |
 | **Notifications** | Slack, Ntfy |
