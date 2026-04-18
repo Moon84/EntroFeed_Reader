@@ -182,7 +182,21 @@ docker run -p 8000:80 entrofeed
 
 - Open an issue at https://github.com/Moon84/EntroFeed_Reader/issues
 - Check the [documentation](docs/) for detailed guides
+- Join our [GitHub Discussions](https://github.com/Moon84/EntroFeed_Reader/discussions)
+
+## Good First Issues
+
+Looking for a way to contribute? Check out these issues labeled as `good first issue`:
+
+- [Good First Issues](https://github.com/Moon84/EntroFeed_Reader/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
+
+## Community Guidelines
+
+- Be respectful and inclusive
+- Follow our [Code of Conduct](CODE_OF_CONDUCT.md)
+- Help others in discussions and issues
+- Share your use cases and feedback
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the **AGPL-3.0 License**.

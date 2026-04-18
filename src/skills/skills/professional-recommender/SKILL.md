@@ -153,6 +153,5 @@ query_capabilities("医学")  # 搜索医学领域
 ## 避免事项
 
 - ❌ 不要推荐未验证的 RSS URL
-- ❌ 不要一次性推荐超过 15 个源
 - ❌ 不要忽略 `manual` 类型网站的 discover_feeds 处理
 - ❌ 不要跳过预配置数据的融合

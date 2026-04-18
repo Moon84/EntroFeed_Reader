@@ -4,6 +4,9 @@
 from .types import (
     TagSource,
     InterestCategory,
+    FollowUpStatus,
+    NodeLayer,
+    UnifiedNode,
     InterestTag,
     UserInterest,
     ContentProfile,
@@ -36,11 +39,15 @@ __all__ = [
     # Types
     "TagSource",
     "InterestCategory",
+    "FollowUpStatus",
+    "NodeLayer",
+    "UnifiedNode",
+    # Legacy types (deprecated)
     "InterestTag",
     "UserInterest",
-    "ContentProfile",
     "OntologyNode",
     "OntologyRelation",
+    "ContentProfile",
     # Registry
     "OntologyRegistry",
     "get_ontology_registry",

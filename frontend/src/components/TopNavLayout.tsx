@@ -104,7 +104,7 @@ export function TopNavLayout() {
       >
         {/* Logo + brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <img src="/assets/EntroFeed_logo.png" alt="EntroFeed" style={{ height: 28 }} />
+          <img src="/assets/EntroFeed_logo.svg" alt="EntroFeed" style={{ height: 28 }} />
           <Text strong style={{ fontSize: 15 }}>{i18n.language === 'zh' ? '熵流' : 'EntroFeed'}</Text>
         </div>
 

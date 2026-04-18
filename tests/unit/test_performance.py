@@ -39,7 +39,9 @@ class TestResponseTime:
     async def test_about_response_time(self, client):
         """About endpoint should respond quickly."""
         start = time.time()
-        response = await client.get("/about", headers={"accept": "application/json"})
+        response = await client.get(
+            "/api/about", headers={"accept": "application/json"}
+        )
         elapsed = time.time() - start
         assert response.status_code == 200
         assert elapsed < 1.0, f"About took {elapsed:.2f}s, expected < 1.0s"
@@ -89,7 +91,7 @@ class TestConcurrentRequests:
         """Test concurrent requests to different endpoints."""
         tasks = [
             client.get("/health"),
-            client.get("/about"),
+            client.get("/api/about"),
             client.get("/util/list-feeds"),
             client.get("/util/list-handlers"),
             client.get("/api/interests"),
@@ -144,11 +146,14 @@ class TestMemoryEfficiency:
     @pytest.mark.asyncio
     async def test_response_size_reasonable(self, client):
         """Test response sizes are reasonable."""
-        response = await client.get("/about", headers={"accept": "application/json"})
+        response = await client.get(
+            "/api/about", headers={"accept": "application/json"}
+        )
         assert response.status_code == 200
         data = response.json()
         # Response should be under 1MB
         import sys
+
         response_size = len(str(data))
         assert response_size < 1024 * 1024, f"Response too large: {response_size} bytes"
 

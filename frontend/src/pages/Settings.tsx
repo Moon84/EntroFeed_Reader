@@ -5,9 +5,10 @@ import { useUserProfile, useSaveUserProfile } from '../hooks/useUserProfile'
 import { useQuery } from '@tanstack/react-query'
 import { getHandlers } from '../client-api/settings'
 import { getLLMStatus } from '../client-api/entries'
+import { getLLMProviders, getCapabilityLabel, type LLMProvider } from '../client-api/llm'
 import { useUIStore } from '../stores/uiStore'
 import type { GlobalSettings } from '../types'
-import { Card, Form, Input, Select, Button, Typography, Skeleton, Divider, Alert, Space } from 'antd'
+import { Card, Form, Input, Select, Button, Typography, Skeleton, Divider, Alert, Space, Tag, Descriptions, Badge } from 'antd'
 
 const { Title, Text } = Typography
 
@@ -27,6 +28,10 @@ export function Settings() {
     queryKey: ['llm-status'],
     queryFn: getLLMStatus,
   })
+  const { data: llmProvidersData } = useQuery({
+    queryKey: ['llm-providers'],
+    queryFn: getLLMProviders,
+  })
   const { setTheme } = useUIStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [form] = Form.useForm()
@@ -35,20 +40,39 @@ export function Settings() {
 
   const [formData, setFormData] = useState<Partial<GlobalSettings>>({})
   const [effectiveLlM, setEffectiveLlM] = useState<string>('')
+  const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [selectedModel, setSelectedModel] = useState<string>('')
+
+  const llmProviders: LLMProvider[] = llmProvidersData?.providers ?? []
+  const currentProvider = llmProviders.find(p => p.id === selectedProvider)
+  const currentModel = currentProvider?.models.find(m => m.name === selectedModel)
 
   useEffect(() => {
     if (settings) {
-      // When llm_handler_key is null_llm, show the actual provider in the UI
       const effective = settings.llm_handler_key === 'null_llm'
         ? (llmStatus?.provider || 'null_llm')
         : settings.llm_handler_key
       setEffectiveLlM(effective)
+      
+      // Try to find the provider from the effective LLM key
+      const provider = llmProviders.find(p => p.id === effective)
+      if (provider) {
+        setSelectedProvider(effective)
+        // Try to set the model from llmStatus
+        if (llmStatus?.model) {
+          const model = provider.models.find(m => m.name === llmStatus.model)
+          if (model) {
+            setSelectedModel(model.name)
+          }
+        }
+      }
+      
       const formValues = { ...settings, llm_handler_key: effective }
       setFormData(formValues)
       setTheme(settings.theme as any)
       form.setFieldsValue(formValues)
     }
-  }, [settings, form, llmStatus])
+  }, [settings, form, llmStatus, llmProviders])
 
   useEffect(() => {
     if (userProfile?.content) {
@@ -66,9 +90,19 @@ export function Settings() {
     }
   }
 
+  const handleProviderChange = (providerId: string) => {
+    setSelectedProvider(providerId)
+    const provider = llmProviders.find(p => p.id === providerId)
+    if (provider && provider.models.length > 0) {
+      setSelectedModel(provider.models[0].name)
+    }
+  }
+
+  const handleModelChange = (modelName: string) => {
+    setSelectedModel(modelName)
+  }
+
   const handleFinish = (values: Partial<GlobalSettings>) => {
-    // When the form shows the effective provider (because llm_handler_key was null_llm),
-    // convert it back to null_llm on save — unless the user explicitly changed it.
     const wasShowingEffective = settings?.llm_handler_key === 'null_llm'
     const selectedLlM = values.llm_handler_key
     const actualLlM = wasShowingEffective
@@ -101,7 +135,6 @@ export function Settings() {
     if (file) restore.mutate(file)
   }
 
-  const llmHandlers = handlers?.filter((h) => h.type === 'llm') ?? []
   const contentHandlers = handlers?.filter((h) => h.type === 'content') ?? []
 
   if (isLoading) {
@@ -113,7 +146,7 @@ export function Settings() {
   }
 
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ maxWidth: 800 }}>
       <Title level={3} style={{ marginBottom: 24 }}>{t('settings.title')}</Title>
 
       <Card size="small" style={{ marginBottom: 16 }}>
@@ -140,14 +173,6 @@ export function Settings() {
 
           <Title level={5} style={{ marginBottom: 16 }}>{t('settings.theme')}</Title>
 
-          <Form.Item label="LLM" name="llm_handler_key">
-            <Select style={{ width: 200 }} placeholder="Default">
-              {llmHandlers.map((h) => (
-                <Select.Option key={h.name} value={h.name}>{h.name}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
           <Form.Item label="Content" name="content_retrieval_handler_key">
             <Select style={{ width: 200 }} placeholder="Default">
               {contentHandlers.map((h) => (
@@ -162,6 +187,162 @@ export function Settings() {
             </Button>
           </Form.Item>
         </Form>
+      </Card>
+
+      {/* LLM Provider Selection */}
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Title level={5} style={{ marginBottom: 16 }}>LLM Provider & Model</Title>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          Select an LLM provider and model for AI-powered features like summaries and recommendations.
+        </Text>
+
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleFinish}
+          initialValues={formData}
+        >
+          {/* Provider Selection */}
+          <Form.Item label="Provider" required>
+            <Select
+              style={{ width: 250 }}
+              placeholder="Select a provider"
+              value={selectedProvider || undefined}
+              onChange={handleProviderChange}
+              suffixIcon={
+                selectedProvider && currentProvider ? (
+                  currentProvider.available ? (
+                    <Badge status="success" />
+                  ) : (
+                    <Badge status="error" />
+                  )
+                ) : undefined
+              }
+            >
+              {llmProviders.map((provider) => (
+                <Select.Option key={provider.id} value={provider.id}>
+                  <Space>
+                    <span>{provider.name}</span>
+                    {provider.available ? (
+                      <Badge status="success" text="Available" />
+                    ) : (
+                      <Badge status="error" text="Not configured" />
+                    )}
+                  </Space>
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          {/* Model Selection */}
+          {currentProvider && currentProvider.models.length > 0 && (
+            <Form.Item label="Model" required>
+              <Select
+                style={{ width: 300 }}
+                placeholder="Select a model"
+                value={selectedModel || undefined}
+                onChange={handleModelChange}
+              >
+                {currentProvider.models.map((model) => (
+                  <Select.Option key={model.name} value={model.name}>
+                    <Space direction="vertical" size={0}>
+                      <span>{model.display_name}</span>
+                      <Space size={4}>
+                        {model.capabilities.map((cap) => {
+                          const info = getCapabilityLabel(cap)
+                          return (
+                            <Tag key={cap} color={info.color} style={{ marginRight: 0, fontSize: 10 }}>
+                              {info.label}
+                            </Tag>
+                          )
+                        })}
+                      </Space>
+                    </Space>
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+
+          {/* Model Details */}
+          {currentModel && (
+            <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+              <Descriptions size="small" column={2}>
+                <Descriptions.Item label="Model">{currentModel.display_name}</Descriptions.Item>
+                <Descriptions.Item label="Context Window">
+                  {currentModel.context_window > 0 
+                    ? `${(currentModel.context_window / 1000).toFixed(0)}K tokens` 
+                    : 'Unknown'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Capabilities" span={2}>
+                  <Space wrap>
+                    {currentModel.capabilities.map((cap) => {
+                      const info = getCapabilityLabel(cap)
+                      return (
+                        <Tag key={cap} color={info.color}>
+                          {info.label}
+                        </Tag>
+                      )
+                    })}
+                  </Space>
+                </Descriptions.Item>
+                {currentModel.description && (
+                  <Descriptions.Item label="Description" span={2}>
+                    <Text type="secondary">{currentModel.description}</Text>
+                  </Descriptions.Item>
+                )}
+                {currentModel.pricing_hint && (
+                  <Descriptions.Item label="Pricing" span={2}>
+                    <Text type="secondary">{currentModel.pricing_hint}</Text>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            </div>
+          )}
+
+          {/* Provider Status */}
+          {selectedProvider && currentProvider && !currentProvider.available && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginTop: 16 }}
+              message="Provider not configured"
+              description={
+                <div>
+                  <Text>Missing environment variables: </Text>
+                  <Text code>{currentProvider.missing_env.join(', ')}</Text>
+                </div>
+              }
+            />
+          )}
+
+          <Form.Item style={{ marginTop: 16 }}>
+            <Button type="primary" htmlType="submit" loading={updateSettings.isPending}>
+              {updateSettings.isPending ? '...' : t('common.save')}
+            </Button>
+          </Form.Item>
+        </Form>
+
+        {/* Usage Stats */}
+        {llmStatus?.usage && (
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+            <Title level={5} style={{ marginBottom: 12 }}>Usage Today</Title>
+            <Space size="large">
+              <div>
+                <Text type="secondary">Input Tokens: </Text>
+                <Text strong>{llmStatus.usage.input_tokens?.toLocaleString() ?? 0}</Text>
+              </div>
+              <div>
+                <Text type="secondary">Output Tokens: </Text>
+                <Text strong>{llmStatus.usage.output_tokens?.toLocaleString() ?? 0}</Text>
+              </div>
+              <div>
+                <Text type="secondary">Cost: </Text>
+                <Text strong>${((llmStatus.usage.total_tokens ?? 0) * 0.00001).toFixed(4)}</Text>
+              </div>
+            </Space>
+          </div>
+        )}
       </Card>
 
       <Card size="small" style={{ marginBottom: 16 }}>

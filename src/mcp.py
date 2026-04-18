@@ -20,7 +20,7 @@ The MCP server exposes the following tools:
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import click
 from mcp.server import Server
@@ -193,7 +193,9 @@ def create_mcp_server():
                 feed_id = arguments.get("feed_id")
                 limit = arguments.get("limit", 20)
                 entries = list(backend.list_entries(feed_id=feed_id, recent=True))
-                return [TextContent(type="text", text=json.dumps(entries[:limit], indent=2))]
+                return [
+                    TextContent(type="text", text=json.dumps(entries[:limit], indent=2))
+                ]
 
             elif name == "get_entry_content":
                 entry_id = arguments.get("entry_id")
@@ -202,6 +204,7 @@ def create_mcp_server():
 
             elif name == "search_entries":
                 from src.agents.tools import search_entries
+
                 query = arguments.get("query", "")
                 limit = arguments.get("limit", 10)
                 result = search_entries(query, limit=limit)
@@ -213,27 +216,40 @@ def create_mcp_server():
                 limit = arguments.get("limit", 10)
 
                 if rec_type == "similar" and entry_id:
-                    from src.recommender import get_similar_recommendations
+                    from src.services.recommendation import get_similar_recommendations
+
                     recs = get_similar_recommendations(entry_id=entry_id, limit=limit)
                 elif rec_type == "trending":
-                    from src.recommender import get_trending_recommendations
+                    from src.services.recommendation import get_trending_recommendations
+
                     recs = get_trending_recommendations(limit=limit)
                 else:
-                    from src.recommender import get_interest_recommendations
+                    from src.services.recommendation import get_interest_recommendations
+
                     recs = get_interest_recommendations(limit=limit)
 
                 return [TextContent(type="text", text=json.dumps(recs, indent=2))]
 
             elif name == "get_user_interests":
                 from src.services.ontology import get_ontology_registry
+
                 registry = get_ontology_registry()
                 category = arguments.get("category")
                 interests = registry.get_user_interests(category=category)
-                return [TextContent(type="text", text=json.dumps([i.to_dict() for i in interests], indent=2))]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps([i.to_dict() for i in interests], indent=2),
+                    )
+                ]
 
             elif name == "add_user_interest":
                 from src.services.ontology import get_ontology_registry
-                from src.services.ontology.types import InterestTag, InterestCategory, TagSource
+                from src.services.ontology.types import (
+                    InterestTag,
+                    InterestCategory,
+                    TagSource,
+                )
 
                 registry = get_ontology_registry()
                 name = arguments.get("name", "").lower()
@@ -246,24 +262,37 @@ def create_mcp_server():
                     cat = InterestCategory.OTHER
 
                 tag = InterestTag(
-                    name=name,
-                    category=cat,
-                    source=TagSource.EXPLICIT,
-                    confidence=1.0
+                    name=name, category=cat, source=TagSource.EXPLICIT, confidence=1.0
                 )
 
                 interest = registry.add_interest(tag, priority)
-                return [TextContent(type="text", text=json.dumps(interest.to_dict(), indent=2))]
+                return [
+                    TextContent(
+                        type="text", text=json.dumps(interest.to_dict(), indent=2)
+                    )
+                ]
 
             elif name == "remove_user_interest":
                 from src.services.ontology import get_ontology_registry
+
                 registry = get_ontology_registry()
                 interest_id = arguments.get("interest_id")
                 success = registry.remove_interest(interest_id)
-                return [TextContent(type="text", text=json.dumps({"success": success, "interest_id": interest_id}))]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {"success": success, "interest_id": interest_id}
+                        ),
+                    )
+                ]
 
             else:
-                return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
+                return [
+                    TextContent(
+                        type="text", text=json.dumps({"error": f"Unknown tool: {name}"})
+                    )
+                ]
 
         except Exception as e:
             logger.error(f"Tool {name} failed: {e}")
@@ -306,7 +335,6 @@ def mcp(port: int, host: str, stdio: bool):
         asyncio.run(run_mcp_server(port, host))
     else:
         # Run TCP server
-        from mcp.server import Server
         from mcp.server.tcp import create_tcp_server
 
         server = create_mcp_server()

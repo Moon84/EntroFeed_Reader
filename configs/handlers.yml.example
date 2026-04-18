@@ -1,0 +1,33 @@
+openai:
+  api_key: abc_123_openai_api_key
+  model: gpt-3.5-turbo
+ollama:
+  base_url: http://localhost:11434
+  model: llama3
+  system: You are a robot that summarizes rss feed entries
+  options:
+    temperature: 0
+dashscope:
+  model: qwen-plus
+  api_key: your_dashscope_api_key
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  system: You are EntroFeed, an intelligent RSS reader assistant that summarizes content
+  temperature: 0.2
+  max_tokens: 4000
+dashscope_vision:
+  model: qwen-vl-max
+  api_key: your_dashscope_api_key
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+slack:
+  token: abc_123_slack_bot_token_goes_here
+  channel_name: rss
+  routing:
+    news: special-news-channel-slack
+matrix:
+  homeserver: http://my-matrix-server/
+  room_id: 123abc
+  username: foo
+  password: bar
+  routing:
+    favorite_blogs: 123abc
+    other_blogs: 456def

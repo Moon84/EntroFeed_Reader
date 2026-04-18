@@ -2,8 +2,7 @@
 """Slack Notification Plugin for EntroFeed."""
 
 from logging import getLogger
-from os import environ
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from pydantic import Field
 from slack_sdk.web.async_client import AsyncWebClient

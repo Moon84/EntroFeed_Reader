@@ -19,7 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.1.0] - 2024-01-01
+## [1.0.1] - 2026-04-17
+
+### Added
+
+- Plugin architecture (notification, content retrieval, storage handlers)
+- Multi-select articles and function calling in AI agent
+- Click-to-configure UI for handlers
+- services/ and skills/ directories structure
+
+### Changed
+
+- Migrated rss.py to services/feed/
+- Updated GitHub links to new repository
+- Use .venv/bin paths in Makefile
+
+### Fixed
+
+- Ontology rating calculation
+- Settings LLM display
+- Three-column reader layout
+
+## [0.3.1] - 2026-04-10
 
 ### Added
 
@@ -37,5 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dark/Light theme support
 - Article translation feature
 
-[Unreleased]: https://github.com/Moon84/EntroFeed_Reader/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Moon84/EntroFeed_Reader/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Moon84/EntroFeed_Reader/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Moon84/EntroFeed_Reader/releases/tag/v1.0.1
+[0.3.1]: https://github.com/Moon84/EntroFeed_Reader/releases/tag/v0.3.1

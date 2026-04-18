@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """Ollama LLM Plugin for EntroFeed."""
 
-from typing import Any, ClassVar, List, Dict, Mapping
+import time
+from typing import Any, ClassVar, Dict, List, Mapping
 
 from ollama import ChatResponse, Client, Message, Options
 from pydantic import Field
 
 from src.handlers import LLMHandler
+from src.metrics import record_llm_request
 from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
@@ -40,14 +42,20 @@ class OllamaLLMHandler(ModelWrapperBase, LLMHandler):
 
         ollama_messages = [Message(role=m["role"], content=m["content"]) for m in messages]
 
-        response: ChatResponse = client.chat(
-            model=self.model,
-            messages=ollama_messages,
-            options=Options(**self.options),
-            **kwargs
-        )
+        start_time = time.time()
+        try:
+            response: ChatResponse = client.chat(
+                model=self.model,
+                messages=ollama_messages,
+                options=Options(**self.options),
+                **kwargs
+            )
 
-        return response["message"]["content"]
+            record_llm_request(self.id, self.model, True, time.time() - start_time)
+            return response["message"]["content"]
+        except Exception:
+            record_llm_request(self.id, self.model, False, time.time() - start_time)
+            raise
 
     def summarize(self, feed: Feed, entry: FeedEntry, mk: str) -> str:
         """Summarize content using Ollama."""

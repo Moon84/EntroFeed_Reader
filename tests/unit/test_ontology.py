@@ -7,6 +7,7 @@ Tests cover:
 - DomainGraph: node management, graph propagation, semantic distance
 - Scoring fixes: weighted formula, bug fixes
 """
+
 import pytest
 import time
 import tempfile
@@ -18,7 +19,7 @@ from src.services.ontology.domain_graph import DomainGraph
 from src.services.ontology.memory import OntologyMemory
 from src.services.ontology.types import (
     InterestTag,
-    UserInterest,
+    UnifiedNode,
     OntologyNode,
     OntologyRelation,
     InterestCategory,
@@ -45,15 +46,17 @@ class TestWikidataResolver:
 
     def test_resolve_known_entity(self, resolver):
         """Test resolving a well-known entity."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {
-                "search": [{
-                    "id": "Q11660",
-                    "label": "Artificial Intelligence",
-                    "description": "Intelligence demonstrated by machines",
-                    "aliases": ["AI", "machine intelligence"]
-                }]
+                "search": [
+                    {
+                        "id": "Q11660",
+                        "label": "Artificial Intelligence",
+                        "description": "Intelligence demonstrated by machines",
+                        "aliases": ["AI", "machine intelligence"],
+                    }
+                ]
             }
             mock_response.raise_for_status = Mock()
             mock_get.return_value = mock_response
@@ -67,7 +70,7 @@ class TestWikidataResolver:
 
     def test_resolve_unknown_returns_none(self, resolver):
         """Test that unknown entities return None."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {"search": []}
             mock_response.raise_for_status = Mock()
@@ -79,15 +82,17 @@ class TestWikidataResolver:
 
     def test_cache_hit(self, resolver):
         """Test that second call uses cache."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {
-                "search": [{
-                    "id": "Q11660",
-                    "label": "AI",
-                    "description": "test",
-                    "aliases": []
-                }]
+                "search": [
+                    {
+                        "id": "Q11660",
+                        "label": "AI",
+                        "description": "test",
+                        "aliases": [],
+                    }
+                ]
             }
             mock_response.raise_for_status = Mock()
             mock_get.return_value = mock_response
@@ -103,14 +108,18 @@ class TestWikidataResolver:
 
     def test_get_relations(self, resolver):
         """Test fetching P31/P279 relations."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {
                 "entities": {
                     "Q11660": {
                         "claims": {
-                            "P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q12345"}}}}],
-                            "P279": [{"mainsnak": {"datavalue": {"value": {"id": "Q67890"}}}}]
+                            "P31": [
+                                {"mainsnak": {"datavalue": {"value": {"id": "Q12345"}}}}
+                            ],
+                            "P279": [
+                                {"mainsnak": {"datavalue": {"value": {"id": "Q67890"}}}}
+                            ],
                         }
                     }
                 }
@@ -125,7 +134,7 @@ class TestWikidataResolver:
 
     def test_rate_limiting(self, resolver):
         """Test that rate limiting enforces delay."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {"search": []}
             mock_response.raise_for_status = Mock()
@@ -141,7 +150,7 @@ class TestWikidataResolver:
 
     def test_disambiguate_with_context(self, resolver):
         """Test disambiguation using context keywords."""
-        with patch('requests.get') as mock_get:
+        with patch("requests.get") as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {
                 "search": [
@@ -149,14 +158,14 @@ class TestWikidataResolver:
                         "id": "Q1",
                         "label": "GPT",
                         "description": "generative pre-trained transformer by openai",
-                        "aliases": []
+                        "aliases": [],
                     },
                     {
                         "id": "Q2",
                         "label": "GPT",
                         "description": "GUID partition table",
-                        "aliases": []
-                    }
+                        "aliases": [],
+                    },
                 ]
             }
             mock_response.raise_for_status = Mock()
@@ -198,11 +207,11 @@ class TestDomainGraph:
         mock_wikidata.get_entity_details.return_value = {
             "labels": {"en": "Artificial Intelligence"},
             "descriptions": {"en": "Intelligence by machines"},
-            "aliases": {"en": ["AI", "machine intelligence"]}
+            "aliases": {"en": ["AI", "machine intelligence"]},
         }
         mock_wikidata.get_relations.return_value = {
             "instance_of": [],
-            "subclass_of": []
+            "subclass_of": [],
         }
 
         qid = graph._add_wikidata_entity("Q11660", "artificial intelligence")
@@ -246,9 +255,9 @@ class TestDomainGraph:
         child_node_id = graph._qid_to_node[child_qid]
         graph.graph.add_edge(
             parent_node_id,  # From parent (interest)
-            child_node_id,   # To child (content)
+            child_node_id,  # To child (content)
             relation_type="subclass_of",
-            weight=0.9
+            weight=0.9,
         )
 
         # Calculate coefficient (interest -> content)
@@ -278,15 +287,17 @@ class TestDomainGraph:
         assert node is not None, "Node should exist after creation"
 
         from datetime import datetime, timedelta
+
         old_date = (datetime.now() - timedelta(days=40)).isoformat()
 
         # Update node with old last_used
         import sqlite3
+
         conn = sqlite3.connect(str(memory.db_path))
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE ontology_nodes SET last_used = ? WHERE wikidata_qid = ?",
-            (old_date, custom_qid)
+            "UPDATE nodes SET last_used = ? WHERE wikidata_qid = ?",
+            (old_date, custom_qid),
         )
         affected = cursor.rowcount
         conn.commit()
@@ -298,8 +309,7 @@ class TestDomainGraph:
         conn = sqlite3.connect(str(memory.db_path))
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT last_used FROM ontology_nodes WHERE wikidata_qid = ?",
-            (custom_qid,)
+            "SELECT last_used FROM nodes WHERE wikidata_qid = ?", (custom_qid,)
         )
         row = cursor.fetchone()
         conn.close()
@@ -328,7 +338,7 @@ class TestScoringFormula:
             "summary": "Researchers develop new artificial intelligence system",
             "source": "https://nature.com/article",
             "published_at": "2026-04-17T10:00:00Z",
-            "tags": [{"name": "artificial intelligence"}]
+            "tags": [{"name": "artificial intelligence"}],
         }
 
         user_interests = [
@@ -337,7 +347,7 @@ class TestScoringFormula:
                 "category": "technology",
                 "priority": 5,
                 "relevance_score": 0.9,
-                "synonyms": ["ai"]
+                "synonyms": ["ai"],
             }
         ]
 
@@ -361,7 +371,7 @@ class TestScoringFormula:
             "summary": "Machine learning breakthrough",
             "source": "https://example.com",
             "published_at": "2026-04-17T10:00:00Z",
-            "tags": []  # No tags, so graph_coefficient will be 0
+            "tags": [],  # No tags, so graph_coefficient will be 0
         }
 
         user_interests = [
@@ -370,7 +380,7 @@ class TestScoringFormula:
                 "category": "technology",
                 "priority": 5,
                 "relevance_score": 0.9,
-                "synonyms": []
+                "synonyms": [],
             }
         ]
 
@@ -389,7 +399,7 @@ class TestScoringFormula:
         result = calculate_authority_score(
             source="https://nejm.org/article",
             title="Randomized Controlled Trial of New Drug",
-            preview="A phase 3 RCT study"
+            preview="A phase 3 RCT study",
         )
 
         assert result["authority_total"] > 0.5
@@ -411,19 +421,18 @@ class TestFindExistingInterestFix:
             name="python",
             category=InterestCategory.TECHNOLOGY,
             confidence=0.8,
-            source=TagSource.INFERENCE
+            source=TagSource.INFERENCE,
         )
 
         interests = [
-            UserInterest(
-                tag=InterestTag(
-                    name="javascript",
-                    category=InterestCategory.TECHNOLOGY,
-                    confidence=0.9,
-                    source=TagSource.EXPLICIT
-                ),
-                priority=3,
-                relevance_score=0.7
+            UnifiedNode(
+                name="javascript",
+                is_interest=True,
+                interest_priority=3,
+                interest_level=0.7,
+                category=InterestCategory.TECHNOLOGY,
+                confidence=0.9,
+                source=TagSource.EXPLICIT,
             )
         ]
 
@@ -438,27 +447,26 @@ class TestFindExistingInterestFix:
             category=InterestCategory.TECHNOLOGY,
             confidence=0.8,
             source=TagSource.INFERENCE,
-            wikidata_qid="Q11660"
+            wikidata_qid="Q11660",
         )
 
         interests = [
-            UserInterest(
-                tag=InterestTag(
-                    name="artificial intelligence",
-                    category=InterestCategory.TECHNOLOGY,
-                    confidence=0.9,
-                    source=TagSource.EXPLICIT,
-                    wikidata_qid="Q11660"
-                ),
-                priority=5,
-                relevance_score=0.9
+            UnifiedNode(
+                name="artificial intelligence",
+                is_interest=True,
+                interest_priority=5,
+                interest_level=0.9,
+                category=InterestCategory.TECHNOLOGY,
+                confidence=0.9,
+                source=TagSource.EXPLICIT,
+                wikidata_qid="Q11660",
             )
         ]
 
         # Should match by QID
         found = updater._find_existing_interest(tag, interests)
         assert found is not None
-        assert found.tag.name == "artificial intelligence"
+        assert found.name == "artificial intelligence"
 
     def test_find_by_synonym(self, updater):
         """Test matching by synonym."""
@@ -466,27 +474,26 @@ class TestFindExistingInterestFix:
             name="ai",
             category=InterestCategory.TECHNOLOGY,
             confidence=0.8,
-            source=TagSource.INFERENCE
+            source=TagSource.INFERENCE,
         )
 
         interests = [
-            UserInterest(
-                tag=InterestTag(
-                    name="artificial intelligence",
-                    category=InterestCategory.TECHNOLOGY,
-                    confidence=0.9,
-                    source=TagSource.EXPLICIT,
-                    synonyms=["ai", "machine intelligence"]
-                ),
-                priority=5,
-                relevance_score=0.9
+            UnifiedNode(
+                name="artificial intelligence",
+                is_interest=True,
+                interest_priority=5,
+                interest_level=0.9,
+                category=InterestCategory.TECHNOLOGY,
+                confidence=0.9,
+                source=TagSource.EXPLICIT,
+                synonyms=["ai", "machine intelligence"],
             )
         ]
 
         # Should match by synonym
         found = updater._find_existing_interest(tag, interests)
         assert found is not None
-        assert found.tag.name == "artificial intelligence"
+        assert found.name == "artificial intelligence"
 
 
 if __name__ == "__main__":

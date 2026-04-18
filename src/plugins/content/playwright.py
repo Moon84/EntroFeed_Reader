@@ -5,7 +5,7 @@ import asyncio
 from logging import getLogger
 from typing import ClassVar, Optional
 
-from playwright.async_api import Playwright, Route, async_playwright, Browser
+from playwright.async_api import Route, async_playwright, Browser
 
 from src.constants import USER_AGENT
 from src.handlers import ContentRetrievalHandler

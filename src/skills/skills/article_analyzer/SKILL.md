@@ -38,7 +38,16 @@ get_entry_content(entry_id="<entry_id>")
 - **证据**: 支持论点的数据、引用或例子
 - **结论**: 作者的最终结论或建议
 
-### 步骤 3: 提取关键信息
+### 步骤3: 补充关联资料
+使用 `search_entries` `web_search` 工具搜索相关主题的其他文章：
+
+```
+search_entries(query="<query>")
+web_search(query="<query>")
+```
+- **对比**：对比文章的观点和证据
+
+### 步骤 4: 提取关键信息
 
 输出结构化的分析结果：
 
@@ -48,8 +57,10 @@ get_entry_content(entry_id="<entry_id>")
   "main_thesis": "核心论点",
   "keyFindings": ["关键发现1", "关键发现2"],
   "supportingEvidence": ["证据1", "证据2"],
+  "conclusion": "结论",
+  "related_articles": ["相关文章1", "相关文章2"],
   "gaps": "文章的局限性或未解决的问题",
-  "relevance": "与用户兴趣的相关性评估"
+  "reference": "与用户兴趣的相关性评估"
 }
 ```
 
@@ -75,6 +86,7 @@ get_entry_content(entry_id="<entry_id>")
 - 可操作建议
 - 相关领域
 
+
 ## Tools
 
 - `get_entry_content`: 获取文章完整内容
@@ -94,7 +106,10 @@ get_entry_content(entry_id="<entry_id>")
    - 主要观点: 深度学习可以提高诊断准确率
    - 关键发现: 在肺癌早期检测中准确率达95%
    - 证据: 基于10万张CT扫描的临床试验
-4. 评估文章质量和适用性
+4. 补充关联资料：
+  - 对比: 其他早期CT扫描对肺癌的诊断率，检出率等的结果，用来对比效果的可靠性
+5. 输出结构化分析结果
+6. 评估文章质量和适用性
 ```
 
 ## Best Practices
@@ -103,3 +118,4 @@ get_entry_content(entry_id="<entry_id>")
 2. **识别信息来源** - 注意作者背景和发表平台
 3. **保持客观** - 既要提取作者观点，也要指出潜在偏见
 4. **关联用户兴趣** - 评估文章与用户关注领域的相关性
+5. **确保来源真实有效** - 验证数据来源和引用来源的可靠性

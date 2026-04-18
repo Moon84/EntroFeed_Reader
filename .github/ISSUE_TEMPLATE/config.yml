@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/Moon84/EntroFeed_Reader/discussions
+    about: For general questions, ideas, and community discussions
+  - name: 📖 Documentation
+    url: https://github.com/Moon84/EntroFeed_Reader#readme
+    about: Check the README for usage instructions
+  - name: 🐛 Security Vulnerabilities
+    url: https://github.com/Moon84/EntroFeed_Reader/security
+    about: Please report security issues through GitHub's security advisories

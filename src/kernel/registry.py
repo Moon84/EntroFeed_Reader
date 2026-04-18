@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from logging import getLogger
 from os import environ
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Type
+from typing import Callable, ClassVar, Dict, List, Optional, Type
 
 from pydantic import BaseModel
 

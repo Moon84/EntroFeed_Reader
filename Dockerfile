@@ -18,10 +18,10 @@ FROM nikolaik/python-nodejs:python3.11-nodejs22-slim AS web
 
 LABEL org.opencontainers.image.title="EntroFeed"
 LABEL org.opencontainers.image.authors="wuyuezhang1984@gmail.com"
-LABEL org.opencontainers.image.source="https://github.com/entrofeed/entrofeed"
-LABEL org.opencontainers.image.url="https://github.com/entrofeed/entrofeed"
+LABEL org.opencontainers.image.source="https://github.com/Moon84/EntroFeed_Reader"
+LABEL org.opencontainers.image.url="https://github.com/Moon84/EntroFeed_Reader"
 LABEL org.opencontainers.image.description="An extensible self-hosted AI-enabled RSS reader with a focus on notifications and support for theming"
-LABEL org.opencontainers.image.licenses=MIT
+LABEL org.opencontainers.image.licenses=AGPL-3.0
 
 WORKDIR /app
 ENV IS_DOCKER=True

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """OpenAI LLM Plugin for EntroFeed."""
 
-from typing import ClassVar, List, Dict
+import time
+from typing import ClassVar, Dict, List
 
 from openai import OpenAI
 from pydantic import Field
 
 from src.handlers import LLMHandler
+from src.metrics import record_llm_request, record_token_usage
 from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
@@ -18,18 +20,30 @@ class OpenAILLMHandler(ModelWrapperBase, LLMHandler):
     model: str = Field(default="gpt-4o-mini")
 
     id: ClassVar[str] = "openai"
+    required_env: ClassVar[List[str]] = ["OPENAI_API_KEY"]
 
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         """Make chat completion call to OpenAI."""
         client = OpenAI(api_key=self.api_key)
 
-        completion = client.chat.completions.create(
-            messages=messages,
-            model=self.model,
-            **kwargs
-        )
+        start_time = time.time()
+        try:
+            completion = client.chat.completions.create(
+                messages=messages,
+                model=self.model,
+                **kwargs
+            )
 
-        return completion.choices[0].message.content
+            # Record metrics
+            usage = completion.usage
+            if usage:
+                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+            record_llm_request(self.id, self.model, True, time.time() - start_time)
+
+            return completion.choices[0].message.content
+        except Exception:
+            record_llm_request(self.id, self.model, False, time.time() - start_time)
+            raise
 
     def summarize(self, feed: Feed, entry: FeedEntry, mk: str) -> str:
         """Summarize content using OpenAI."""

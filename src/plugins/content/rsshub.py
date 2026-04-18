@@ -6,6 +6,7 @@ from logging import getLogger
 from typing import ClassVar
 
 import httpx
+from pydantic import Field
 
 from src.constants import USER_AGENT
 from src.handlers import ContentRetrievalHandler
@@ -17,9 +18,9 @@ logger = getLogger("uvicorn.error")
 class RSSHubContentRetriever(ContentPluginBase, ContentRetrievalHandler):
     id: ClassVar[str] = "rsshub"
     headers: ClassVar[dict] = {"User-Agent": USER_AGENT}
-
-    def __init__(self):
-        self.base_url = os.getenv("RSSHUB_HOST", "http://localhost:1200")
+    base_url: str = Field(
+        default_factory=lambda: os.getenv("RSSHUB_HOST", "http://localhost:1200")
+    )
 
     async def get_html(self, url: str, use_script: bool = False) -> str:
         """Fetch HTML content via RSSHub render endpoint with fallback to direct fetch."""
@@ -38,7 +39,9 @@ class RSSHubContentRetriever(ContentPluginBase, ContentRetrievalHandler):
 
                     if response.status_code == 200 and response.text:
                         return response.text
-                    logger.warning(f"RSSHub render failed for {url}: status={response.status_code}")
+                    logger.warning(
+                        f"RSSHub render failed for {url}: status={response.status_code}"
+                    )
                 except httpx.RequestError as rsshub_error:
                     logger.warning(f"RSSHub render error for {url}: {rsshub_error}")
 

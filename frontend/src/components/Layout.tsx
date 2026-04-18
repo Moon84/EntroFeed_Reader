@@ -133,7 +133,7 @@ export function Layout() {
         <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <img
-              src="/assets/EntroFeed_logo.png"
+              src="/assets/EntroFeed_logo.svg"
               alt="EntroFeed"
               style={{ height: 32 }}
             />

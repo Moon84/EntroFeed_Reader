@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 
 from agentscope.agents import ReActAgent
 from agentscope.memory import TemporaryMemory
-from agentscope.message import Msg
 
 logger = logging.getLogger(__name__)
 

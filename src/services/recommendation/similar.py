@@ -2,13 +2,11 @@
 """
 Similar Content Recommender - Vector-based similar content discovery.
 """
-from typing import List, Dict, Any, Optional, Set, TYPE_CHECKING
-from datetime import datetime
+from typing import List, Dict, Any, Set, TYPE_CHECKING
 
-from src.models.feed import FeedEntry
 
 if TYPE_CHECKING:
-    from src.services.ontology.memory import OntologyMemory
+    pass
 
 
 class SimilarRecommender:

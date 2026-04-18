@@ -13,7 +13,6 @@ Priority Scorer - 基于 DIKW 的文章重要性评估工具
 """
 
 import os
-import json
 import re
 import math
 from collections import defaultdict
@@ -22,9 +21,6 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from .types import (
-    InterestTag,
-    UserInterest,
-    ContentProfile,
     InterestCategory,
 )
 from .tagging import TagMatcher
@@ -1004,15 +1000,15 @@ class PriorityScorer:
             registry = get_ontology_registry()
             interests = registry.get_user_interests()
 
-            # 转换为字典格式
+            # 转换为字典格式（UnifiedNode 的扁平结构）
             self._user_interests_cache = [
                 {
-                    "name": i.tag.name,
-                    "category": i.tag.category.value,
-                    "priority": i.priority,
-                    "relevance_score": i.relevance_score,
+                    "name": i.name,
+                    "category": i.category.value if hasattr(i.category, 'value') else str(i.category),
+                    "priority": i.interest_priority,
+                    "relevance_score": i.interest_level,
                     "access_count": i.access_count,
-                    "synonyms": i.tag.synonyms,
+                    "synonyms": i.synonyms,
                 }
                 for i in interests
             ]
@@ -1341,7 +1337,6 @@ class ArticleTagger:
         from .domain_graph import DomainGraph
         from .wikidata import WikidataResolver
         from .memory import OntologyMemory
-        import os
 
         data_dir = os.getenv("DATA_DIR", "./data")
         memory = OntologyMemory(data_dir=data_dir)

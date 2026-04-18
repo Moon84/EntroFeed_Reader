@@ -4,10 +4,9 @@ from importlib.metadata import version
 from json import dumps, loads
 from logging import getLogger
 from sys import version as py_version
-from time import localtime, strftime, time
-from typing import List, Mapping, Optional, Type
+from time import time
+from typing import List, Mapping, Optional
 
-from pydantic import BaseModel
 from textstat import textstat as txt
 
 from src.constants import GITHUB_LINK, IS_DOCKER

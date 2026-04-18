@@ -11,8 +11,14 @@
 [![React](https://img.shields.io/badge/react-18.x-61dafb.svg)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/fastapi-0.109+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
+[![Tests](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/test.yml/badge.svg)](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Moon84/EntroFeed_Reader/branch/main/graph/badge.svg)](https://codecov.io/gh/Moon84/EntroFeed_Reader)
+[![CodeQL](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/security.yml/badge.svg)](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/security.yml)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/Moon84/EntroFeed_Reader/security/dependabot)
+[![Last Commit](https://img.shields.io/github/last-commit/Moon84/EntroFeed_Reader/main)](https://github.com/Moon84/EntroFeed_Reader/commits/main)
+[![Commit Activity](https://img.shields.io/github/commit-activity/w/Moon84/EntroFeed_Reader)](https://github.com/Moon84/EntroFeed_Reader/graphs/commit-activity)
 
-![Logo](src/assets/EntroFeed_logo_w_name.png)
+![Logo](src/assets/EntroFeed_logo.svg)
 
 > **中文** | [English](README.md)
 
@@ -279,13 +285,27 @@ entrofeed mcp --stdio
 
 ## 🤝 贡献
 
-欢迎提交贡献！请随时提交 Pull Request。
+欢迎提交贡献！请阅读我们的 [贡献指南](CONTRIBUTING.md) 了解更多。
+
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat-square)](https://github.com/Moon84/EntroFeed_Reader/blob/main/CONTRIBUTING.md)
+[![GitHub Issues](https://img.shields.io/github/issues/Moon84/EntroFeed_Reader?logo=github)](https://github.com/Moon84/EntroFeed_Reader/issues)
+[![GitHub PRs](https://img.shields.io/github/issues-pr/Moon84/EntroFeed_Reader?logo=github)](https://github.com/Moon84/EntroFeed_Reader/pulls)
+
+### 快速指南
 
 1. Fork 本仓库
 2. 创建您的功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交您的更改 (`git commit -m 'Add some amazing feature'`)
+3. 提交您的更改 (`git commit -m 'feat(scope): add amazing feature'`)
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启 Pull Request
+
+### 新手友好 Issue
+
+想找一个入门项目？查看标记为 [`good first issue`](https://github.com/Moon84/EntroFeed_Reader/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) 的问题！
+
+### 行为准则
+
+参与本项目即表示您同意遵守我们的 [行为准则](CODE_OF_CONDUCT.md)。
 
 ## 📄 许可证
 
@@ -304,10 +324,14 @@ entrofeed mcp --stdio
 - **作者**：张寅磊 (Yinlei Zhang)
 - **邮箱**：wuyuezhang1984@gmail.com
 - **问题反馈**：[GitHub Issues](https://github.com/Moon84/EntroFeed_Reader/issues)
+- **讨论区**：[GitHub Discussions](https://github.com/Moon84/EntroFeed_Reader/discussions)
 
 ---
 
 <div align="center">
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-Moon84-blue?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/Moon84)
+[![Open Source Love](https://badges.frapsoft.com/os/v2/open-source.svg?v=103)](https://github.com/ellerbrock/open-source-badges/)
 
 *如果 EntroFeed 对您有帮助，请在 GitHub 上给我们一个 ⭐！*
 

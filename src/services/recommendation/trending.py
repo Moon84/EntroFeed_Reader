@@ -2,9 +2,8 @@
 """
 Trending Recommender - Recommend popular/trending content.
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
-from collections import Counter
+from typing import List, Dict, Any
+from datetime import datetime
 
 from src.services.ontology.types import ContentProfile
 

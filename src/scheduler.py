@@ -173,7 +173,10 @@ class SchedulerManager:
         """
         job = self.scheduler.get_job(task_id)
         if job:
-            return job.next_run_time
+            try:
+                return job.next_run_time
+            except (AttributeError, TypeError):
+                return None
         return None
 
     def get_all_jobs(self) -> Dict[str, Dict[str, Any]]:
@@ -184,9 +187,13 @@ class SchedulerManager:
         """
         jobs = {}
         for job in self.scheduler.get_jobs():
+            try:
+                next_run = job.next_run_time
+            except (AttributeError, TypeError):
+                next_run = None
             jobs[job.id] = {
                 "name": job.name,
-                "next_run_time": job.next_run_time,
+                "next_run_time": next_run,
                 "trigger": str(job.trigger),
             }
         return jobs
@@ -225,7 +232,6 @@ def get_scheduler() -> SchedulerManager:
 
 async def poll_feeds_task() -> None:
     """Background task wrapper for RSS feed polling."""
-    import asyncio
     from src.services.feed.service import EntroFeedRSS
     from src.storage.singleton import get_storage
 
@@ -285,8 +291,10 @@ async def ontology_daily_batch_task() -> None:
     try:
         registry = get_ontology_registry()
         result = registry.run_daily_batch_update()
-        logger.info(f"Ontology batch update: {result.get('processed', 0)} entries processed, "
-                    f"{result.get('entities_extracted', 0)} entities extracted")
+        logger.info(
+            f"Ontology batch update: {result.get('processed', 0)} entries processed, "
+            f"{result.get('entities_extracted', 0)} entities extracted"
+        )
 
         # Apply interest decay for stale interests
         registry.apply_decay(days=1)

@@ -6,16 +6,20 @@ This module provides:
 - Priority calculation for content
 - Relevance scoring for user interests
 - Interest decay and boosting
+
+Now uses UnifiedNode for all interest tracking.
 """
+
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 from .types import (
+    UnifiedNode,
     InterestTag,
-    UserInterest,
     ContentProfile,
     TagSource,
     InterestCategory,
+    NodeLayer,
 )
 from .tagging import TagMatcher
 
@@ -32,15 +36,13 @@ class PriorityEvaluator:
         self.tag_matcher = tag_matcher or TagMatcher()
 
     def evaluate_content_priority(
-        self,
-        profile: ContentProfile,
-        user_interests: List[UserInterest]
+        self, profile: ContentProfile, user_interests: List[UnifiedNode]
     ) -> int:
         """Evaluate content priority (0-5).
 
         Args:
             profile: Content profile with tags
-            user_interests: User's tracked interests
+            user_interests: User's tracked interests (UnifiedNodes)
 
         Returns:
             Priority score 0-5
@@ -48,40 +50,32 @@ class PriorityEvaluator:
         if not profile.tags:
             return 0
 
-        return self.tag_matcher.calculate_priority(
-            profile.tags,
-            user_interests
-        )
+        return self.tag_matcher.calculate_priority(profile.tags, user_interests)
 
     def evaluate_batch_priority(
-        self,
-        profiles: List[ContentProfile],
-        user_interests: List[UserInterest]
+        self, profiles: List[ContentProfile], user_interests: List[UnifiedNode]
     ) -> List[int]:
         """Evaluate priority for multiple content profiles.
 
         Returns:
             List of priority scores aligned with input profiles
         """
-        return [
-            self.evaluate_content_priority(p, user_interests)
-            for p in profiles
-        ]
+        return [self.evaluate_content_priority(p, user_interests) for p in profiles]
 
 
 class InterestUpdater:
-    """Update user interests based on reading behavior."""
+    """Update user interests based on reading behavior using UnifiedNode."""
 
     # Decay rates
     DAILY_DECAY_RATE = 0.01  # 1% per day
-    READING_BOOST = 0.05     # 5% boost when accessed
+    READING_BOOST = 0.05  # 5% boost when accessed
     HIGH_PRIORITY_BOOST = 0.1  # 10% boost for high priority content
 
     # Like/dislike boost/decay factors
-    LIKED_BOOST = 0.1        # +10% for liked
-    FAVORITED_BOOST = 0.15   # +15% for favorited
-    DISLIKED_DECAY = 0.2     # -20% for disliked
-    MIN_RELEVANCE = 0.1      # Floor for suppressed interests
+    LIKED_BOOST = 0.1  # +10% for liked
+    FAVORITED_BOOST = 0.15  # +15% for favorited
+    DISLIKED_DECAY = 0.2  # -20% for disliked
+    MIN_RELEVANCE = 0.1  # Floor for suppressed interests
 
     def __init__(self):
         pass
@@ -90,17 +84,17 @@ class InterestUpdater:
         self,
         content_tags: List[InterestTag],
         content_priority: int,
-        user_interests: List[UserInterest]
-    ) -> List[UserInterest]:
+        user_interests: List[UnifiedNode],
+    ) -> List[UnifiedNode]:
         """Update user interests after reading content.
 
         Args:
             content_tags: Tags from the content read
             content_priority: Calculated priority of the content
-            user_interests: Current user interests
+            user_interests: Current user interests (UnifiedNodes)
 
         Returns:
-            Updated user interests
+            Updated UnifiedNodes
         """
         updated = {i.id: i for i in user_interests}
         now = datetime.now().isoformat()
@@ -112,22 +106,30 @@ class InterestUpdater:
                 # Update existing interest
                 existing.mark_accessed()
                 if content_priority >= 4:
-                    existing.relevance_score = min(
-                        1.0,
-                        existing.relevance_score + self.HIGH_PRIORITY_BOOST
+                    existing.interest_level = min(
+                        1.0, existing.interest_level + self.HIGH_PRIORITY_BOOST
                     )
-                existing.priority = max(
-                    existing.priority,
-                    content_priority // 2
+                existing.interest_priority = max(
+                    existing.interest_priority, content_priority // 2
                 )
             else:
-                # Create new interest
-                new_interest = UserInterest(
-                    tag=tag,
-                    priority=content_priority // 2,
+                # Create new interest as UnifiedNode
+                new_interest = UnifiedNode(
+                    name=tag.name,
+                    category=tag.category,
+                    source=TagSource.BEHAVIOR,
+                    is_interest=True,
+                    interest_priority=content_priority // 2,
+                    interest_level=0.3 + (content_priority * 0.05),
                     access_count=1,
                     last_accessed=now,
-                    relevance_score=0.3 + (content_priority * 0.05)
+                    wikidata_qid=tag.wikidata_qid,
+                    wikidata_label=tag.wikidata_label,
+                    wikidata_description=tag.wikidata_description,
+                    synonyms=tag.synonyms,
+                    confidence=tag.confidence,
+                    properties=tag.properties,
+                    layer=NodeLayer.LLM_EXPANEDED.value,
                 )
                 updated[new_interest.id] = new_interest
 
@@ -136,18 +138,18 @@ class InterestUpdater:
     def update_interests_on_like(
         self,
         content_tags: List[InterestTag],
-        user_interests: List[UserInterest],
-        is_favorited: bool = False
-    ) -> List[UserInterest]:
+        user_interests: List[UnifiedNode],
+        is_favorited: bool = False,
+    ) -> List[UnifiedNode]:
         """Update user interests after liking/favoriting content.
 
         Args:
             content_tags: Tags from the content liked
-            user_interests: Current user interests
+            user_interests: Current user interests (UnifiedNodes)
             is_favorited: True if this was a favorite (higher boost)
 
         Returns:
-            Updated user interests
+            Updated UnifiedNodes
         """
         boost = self.FAVORITED_BOOST if is_favorited else self.LIKED_BOOST
         updated = {i.id: i for i in user_interests}
@@ -158,44 +160,42 @@ class InterestUpdater:
 
             if existing:
                 # Boost existing interest
-                existing.relevance_score = min(
-                    1.0,
-                    existing.relevance_score + boost
-                )
+                existing.interest_level = min(1.0, existing.interest_level + boost)
                 existing.access_count += 1
                 existing.last_accessed = now
             else:
                 # Create new inferred interest with medium confidence
-                new_interest = UserInterest(
-                    tag=InterestTag(
-                        name=tag.name,
-                        category=tag.category,
-                        confidence=0.5,
-                        source=TagSource.BEHAVIOR,  # Inferred from behavior
-                        synonyms=tag.synonyms,
-                    ),
-                    priority=3,  # Default medium priority
+                new_interest = UnifiedNode(
+                    name=tag.name,
+                    category=tag.category,
+                    source=TagSource.BEHAVIOR,  # Inferred from behavior
+                    is_interest=True,
+                    interest_priority=3,  # Default medium priority
+                    interest_level=0.5 + boost,  # Start higher for liked
                     access_count=1,
                     last_accessed=now,
-                    relevance_score=0.5 + boost  # Start higher for liked
+                    synonyms=tag.synonyms,
+                    wikidata_qid=tag.wikidata_qid,
+                    wikidata_label=tag.wikidata_label,
+                    wikidata_description=tag.wikidata_description,
+                    confidence=0.5,
+                    layer=NodeLayer.LLM_EXPANEDED.value,
                 )
                 updated[new_interest.id] = new_interest
 
         return list(updated.values())
 
     def update_interests_on_dislike(
-        self,
-        content_tags: List[InterestTag],
-        user_interests: List[UserInterest]
-    ) -> List[UserInterest]:
+        self, content_tags: List[InterestTag], user_interests: List[UnifiedNode]
+    ) -> List[UnifiedNode]:
         """Update user interests after disliking content.
 
         Args:
             content_tags: Tags from the content disliked
-            user_interests: Current user interests
+            user_interests: Current user interests (UnifiedNodes)
 
         Returns:
-            Updated user interests
+            Updated UnifiedNodes
         """
         updated = {i.id: i for i in user_interests}
 
@@ -204,29 +204,26 @@ class InterestUpdater:
 
             if existing:
                 # Decay existing interest
-                existing.relevance_score = max(
-                    self.MIN_RELEVANCE,
-                    existing.relevance_score - self.DISLIKED_DECAY
+                existing.interest_level = max(
+                    self.MIN_RELEVANCE, existing.interest_level - self.DISLIKED_DECAY
                 )
                 # If score is very low, consider suppressing this interest
-                if existing.relevance_score <= self.MIN_RELEVANCE:
-                    existing.priority = max(0, existing.priority - 1)
+                if existing.interest_level <= self.MIN_RELEVANCE:
+                    existing.interest_priority = max(0, existing.interest_priority - 1)
 
         return list(updated.values())
 
     def decay_interests(
-        self,
-        user_interests: List[UserInterest],
-        days_since_last_update: int
-    ) -> List[UserInterest]:
+        self, user_interests: List[UnifiedNode], days_since_last_update: int
+    ) -> List[UnifiedNode]:
         """Apply time-based decay to user interests.
 
         Args:
-            user_interests: Current user interests
+            user_interests: Current user interests (UnifiedNodes)
             days_since_last_update: Number of days since last decay
 
         Returns:
-            Decayed user interests
+            Decayed UnifiedNodes
         """
         decay_amount = days_since_last_update * self.DAILY_DECAY_RATE
 
@@ -236,9 +233,8 @@ class InterestUpdater:
                 last_access = datetime.fromisoformat(interest.last_accessed)
                 days_ago = (datetime.now() - last_access).days
                 if days_ago > 7:  # Don't decay if accessed within a week
-                    interest.relevance_score = max(
-                        0.1,
-                        interest.relevance_score - decay_amount
+                    interest.interest_level = max(
+                        0.1, interest.interest_level - decay_amount
                     )
 
         return user_interests
@@ -246,33 +242,30 @@ class InterestUpdater:
     def boost_interest(
         self,
         interest_id: str,
-        user_interests: List[UserInterest],
-        boost_amount: float = 0.1
-    ) -> Optional[UserInterest]:
+        user_interests: List[UnifiedNode],
+        boost_amount: float = 0.1,
+    ) -> Optional[UnifiedNode]:
         """Boost a specific interest.
 
         Args:
             interest_id: ID of interest to boost
-            user_interests: Current user interests
+            user_interests: Current user interests (UnifiedNodes)
             boost_amount: Amount to boost (0.0-1.0)
 
         Returns:
-            Updated interest or None if not found
+            Updated UnifiedNode or None if not found
         """
         for interest in user_interests:
             if interest.id == interest_id:
-                interest.relevance_score = min(
-                    1.0,
-                    interest.relevance_score + boost_amount
+                interest.interest_level = min(
+                    1.0, interest.interest_level + boost_amount
                 )
                 return interest
         return None
 
     def _find_existing_interest(
-        self,
-        tag: InterestTag,
-        user_interests: List[UserInterest]
-    ) -> Optional[UserInterest]:
+        self, tag: InterestTag, user_interests: List[UnifiedNode]
+    ) -> Optional[UnifiedNode]:
         """Find existing interest matching the tag.
 
         Matching priority:
@@ -281,19 +274,22 @@ class InterestUpdater:
         3. Synonym match
         """
         for interest in user_interests:
-            # Exact name match
-            if interest.tag.name.lower() == tag.name.lower():
+            # Exact name match (UnifiedNode uses name directly)
+            if interest.name.lower() == tag.name.lower():
                 return interest
 
             # Wikidata QID match (standardized entity)
-            if (tag.wikidata_qid and interest.tag.wikidata_qid
-                and tag.wikidata_qid == interest.tag.wikidata_qid):
+            if (
+                tag.wikidata_qid
+                and interest.wikidata_qid
+                and tag.wikidata_qid == interest.wikidata_qid
+            ):
                 return interest
 
-            # Synonym match
-            if tag.name.lower() in [s.lower() for s in interest.tag.synonyms]:
+            # Synonym match (UnifiedNode uses synonyms directly)
+            if tag.name.lower() in [s.lower() for s in interest.synonyms]:
                 return interest
-            if interest.tag.name.lower() in [s.lower() for s in tag.synonyms]:
+            if interest.name.lower() in [s.lower() for s in tag.synonyms]:
                 return interest
 
         return None
@@ -326,56 +322,58 @@ class InterestInferrer:
     def infer_from_reading_history(
         self,
         profiles: List[ContentProfile],
-        existing_interests: List[UserInterest],
-        min_confidence: float = 0.3
+        existing_interests: List[UnifiedNode],
+        min_confidence: float = 0.3,
     ) -> List[InterestTag]:
         """Infer new interests from reading history.
 
         Args:
             profiles: Content profiles from reading history
-            existing_interests: Current user interests
+            existing_interests: Current user interests (UnifiedNodes)
             min_confidence: Minimum confidence threshold
 
         Returns:
             List of inferred interest tags
         """
-        existing_tag_names = {i.tag.name.lower() for i in existing_interests}
-        existing_categories = {i.tag.category for i in existing_interests}
+        existing_names = {i.name.lower() for i in existing_interests}
+        existing_categories = {i.category for i in existing_interests}
 
         tag_counts: Dict[str, int] = {}
 
         # Count tag occurrences
         for profile in profiles:
             for tag in profile.tags:
-                if tag.name.lower() not in existing_tag_names:
+                if tag.name.lower() not in existing_names:
                     if tag.confidence >= min_confidence:
-                        tag_counts[tag.name.lower()] = \
+                        tag_counts[tag.name.lower()] = (
                             tag_counts.get(tag.name.lower(), 0) + 1
+                        )
 
         # Infer new tags based on frequency
         inferred = []
         for tag_name, count in tag_counts.items():
             if count >= 2:  # At least 2 occurrences
-                category = self.COMMON_INTERESTS.get(
-                    tag_name,
-                    InterestCategory.OTHER
-                )
+                category = self.COMMON_INTERESTS.get(tag_name, InterestCategory.OTHER)
 
                 # Don't infer if we already have this category strongly
                 existing_same_cat = [
-                    i for i in existing_interests
-                    if i.tag.category == category
+                    i for i in existing_interests if i.category == category
                 ]
-                if existing_same_cat and max(i.relevance_score for i in existing_same_cat) > 0.7:
+                if (
+                    existing_same_cat
+                    and max(i.interest_level for i in existing_same_cat) > 0.7
+                ):
                     continue
 
                 confidence = min(0.9, 0.2 + (count * 0.1))
-                inferred.append(InterestTag(
-                    name=tag_name,
-                    category=category,
-                    confidence=confidence,
-                    source=TagSource.INFERENCE
-                ))
+                inferred.append(
+                    InterestTag(
+                        name=tag_name,
+                        category=category,
+                        confidence=confidence,
+                        source=TagSource.INFERENCE,
+                    )
+                )
 
         return inferred
 

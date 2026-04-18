@@ -8,11 +8,12 @@ This module provides a NetworkX-based domain graph that:
 - Calculates semantic distances and graph propagation scores
 - Persists to SQLite for durability
 """
+
 import uuid
 import logging
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 
@@ -29,21 +30,21 @@ class DomainGraph:
 
     # Relation type weights
     RELATION_WEIGHTS = {
-        "subclass_of": 0.9,      # P279 - strong hierarchical
-        "instance_of": 0.85,     # P31 - strong typing
-        "related_to": 0.5,       # LLM-inferred - medium
-        "cross_domain": 0.6,     # Cross-domain connection - medium
+        "subclass_of": 0.9,  # P279 - strong hierarchical
+        "instance_of": 0.85,  # P31 - strong typing
+        "related_to": 0.5,  # LLM-inferred - medium
+        "cross_domain": 0.6,  # Cross-domain connection - medium
     }
 
     # Graph propagation parameters
-    HOP_DECAY = 0.5              # Each hop multiplies score by 0.5
-    MAX_HOPS = 2                 # Maximum propagation distance
+    HOP_DECAY = 0.5  # Each hop multiplies score by 0.5
+    MAX_HOPS = 2  # Maximum propagation distance
 
     def __init__(
         self,
         memory: OntologyMemory,
         wikidata: WikidataResolver,
-        llm_handler: Any = None
+        llm_handler: Any = None,
     ):
         """Initialize domain graph.
 
@@ -74,7 +75,7 @@ class DomainGraph:
                 node_type=node.node_type,
                 category=node.category,
                 synonyms=node.synonyms,
-                confidence=node.confidence
+                confidence=node.confidence,
             )
             if node.wikidata_qid:
                 self._qid_to_node[node.wikidata_qid] = node.id
@@ -91,16 +92,15 @@ class DomainGraph:
                     target_node_id,
                     relation_type=edge.relation_type,
                     weight=edge.weight,
-                    edge_source=edge.properties.get("edge_source", "wikidata")
+                    edge_source=edge.properties.get("edge_source", "wikidata"),
                 )
 
-        logger.info(f"Loaded domain graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
+        logger.info(
+            f"Loaded domain graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges"
+        )
 
     def resolve_and_add(
-        self,
-        entity_name: str,
-        context: List[str] = None,
-        language: str = "en"
+        self, entity_name: str, context: List[str] = None, language: str = "en"
     ) -> str:
         """Resolve entity name to QID and add to graph.
 
@@ -139,7 +139,9 @@ class DomainGraph:
         else:
             return self._create_custom_entity(entity_name)
 
-    def _add_wikidata_entity(self, qid: str, entity_name: str, language: str = "en") -> str:
+    def _add_wikidata_entity(
+        self, qid: str, entity_name: str, language: str = "en"
+    ) -> str:
         """Add Wikidata entity as Layer 2 node.
 
         Args:
@@ -177,7 +179,7 @@ class DomainGraph:
             layer=2,
             node_type="concept",
             synonyms=aliases,
-            confidence=1.0
+            confidence=1.0,
         )
 
         # Save to storage
@@ -193,7 +195,7 @@ class DomainGraph:
             layer=2,
             node_type="concept",
             synonyms=aliases,
-            confidence=1.0
+            confidence=1.0,
         )
         self._qid_to_node[qid] = node.id
 
@@ -222,7 +224,9 @@ class DomainGraph:
                 # Recursively add target (but don't fetch its relations to avoid infinite loop)
                 target_result = self.wikidata.resolve(target_qid)
                 if target_result:
-                    self._add_wikidata_entity(target_qid, target_result.get("label", target_qid))
+                    self._add_wikidata_entity(
+                        target_qid, target_result.get("label", target_qid)
+                    )
 
             target_node_id = self._qid_to_node.get(target_qid)
             if target_node_id:
@@ -231,7 +235,7 @@ class DomainGraph:
                     target_id=target_qid,
                     relation_type="instance_of",
                     weight=self.RELATION_WEIGHTS["instance_of"],
-                    properties={"edge_source": "wikidata"}
+                    properties={"edge_source": "wikidata"},
                 )
                 self.memory.save_ontology_edge(edge)
                 self.graph.add_edge(
@@ -239,7 +243,7 @@ class DomainGraph:
                     target_node_id,
                     relation_type="instance_of",
                     weight=self.RELATION_WEIGHTS["instance_of"],
-                    edge_source="wikidata"
+                    edge_source="wikidata",
                 )
 
         # Add subclass_of (P279) edges
@@ -247,7 +251,9 @@ class DomainGraph:
             if target_qid not in self._qid_to_node:
                 target_result = self.wikidata.resolve(target_qid)
                 if target_result:
-                    self._add_wikidata_entity(target_qid, target_result.get("label", target_qid))
+                    self._add_wikidata_entity(
+                        target_qid, target_result.get("label", target_qid)
+                    )
 
             target_node_id = self._qid_to_node.get(target_qid)
             if target_node_id:
@@ -256,7 +262,7 @@ class DomainGraph:
                     target_id=target_qid,
                     relation_type="subclass_of",
                     weight=self.RELATION_WEIGHTS["subclass_of"],
-                    properties={"edge_source": "wikidata"}
+                    properties={"edge_source": "wikidata"},
                 )
                 self.memory.save_ontology_edge(edge)
                 self.graph.add_edge(
@@ -264,7 +270,7 @@ class DomainGraph:
                     target_node_id,
                     relation_type="subclass_of",
                     weight=self.RELATION_WEIGHTS["subclass_of"],
-                    edge_source="wikidata"
+                    edge_source="wikidata",
                 )
 
     def _create_custom_entity(self, entity_name: str) -> str:
@@ -285,7 +291,7 @@ class DomainGraph:
             wikidata_description=f"Custom entity: {entity_name}",
             layer=3,
             node_type="entity",
-            confidence=0.7
+            confidence=0.7,
         )
 
         self.memory.save_ontology_node(node)
@@ -298,7 +304,7 @@ class DomainGraph:
             description=f"Custom entity: {entity_name}",
             layer=3,
             node_type="entity",
-            confidence=0.7
+            confidence=0.7,
         )
         self._qid_to_node[custom_id] = node.id
 
@@ -336,9 +342,7 @@ class DomainGraph:
             return 1.0
 
     def calculate_graph_coefficient(
-        self,
-        content_qids: List[str],
-        interest_qids: List[str]
+        self, content_qids: List[str], interest_qids: List[str]
     ) -> Dict[str, Any]:
         """Calculate graph propagation coefficient for content.
 
@@ -367,7 +371,7 @@ class DomainGraph:
                 "graph_coefficient": 0.0,
                 "best_match": None,
                 "matched_seeds": [],
-                "hop_details": []
+                "hop_details": [],
             }
 
         best_coefficient = 0.0
@@ -391,7 +395,9 @@ class DomainGraph:
                     hops = 0
                     match_type = "exact"
                 else:
-                    coefficient, hops = self._bfs_propagation(interest_node, content_node)
+                    coefficient, hops = self._bfs_propagation(
+                        interest_node, content_node
+                    )
                     if hops == 1:
                         match_type = "hop_1"
                     elif hops == 2:
@@ -405,18 +411,20 @@ class DomainGraph:
                         "seed_qid": interest_qid,
                         "content_qid": content_qid,
                         "hops": hops,
-                        "match_type": match_type
+                        "match_type": match_type,
                     }
 
                 if coefficient > 0:
                     matched_seeds.append(interest_qid)
-                    hop_details.append({
-                        "seed_qid": interest_qid,
-                        "content_qid": content_qid,
-                        "coefficient": round(coefficient, 4),
-                        "hops": hops,
-                        "match_type": match_type
-                    })
+                    hop_details.append(
+                        {
+                            "seed_qid": interest_qid,
+                            "content_qid": content_qid,
+                            "coefficient": round(coefficient, 4),
+                            "hops": hops,
+                            "match_type": match_type,
+                        }
+                    )
 
         matched_seeds = list(set(matched_seeds))
 
@@ -424,7 +432,7 @@ class DomainGraph:
             "graph_coefficient": round(best_coefficient, 4),
             "best_match": best_match,
             "matched_seeds": matched_seeds,
-            "hop_details": hop_details
+            "hop_details": hop_details,
         }
 
     def _bfs_propagation(self, source_node: str, target_node: str) -> Tuple[float, int]:
@@ -496,7 +504,7 @@ class DomainGraph:
 
         # Remove nodes
         for qid in nodes_to_remove:
-            self.memory.delete_ontology_node(qid)
+            self.memory.delete_node(qid)
             node_id = self._qid_to_node.pop(qid, None)
             if node_id and node_id in self.graph:
                 self.graph.remove_node(node_id)
@@ -519,7 +527,9 @@ class DomainGraph:
 
         return self.graph.nodes[node_id]
 
-    def get_neighbors(self, qid: str, direction: str = "outgoing") -> List[Dict[str, Any]]:
+    def get_neighbors(
+        self, qid: str, direction: str = "outgoing"
+    ) -> List[Dict[str, Any]]:
         """Get neighboring nodes.
 
         Args:

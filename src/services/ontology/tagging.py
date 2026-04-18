@@ -4,16 +4,17 @@ Ontology Tagging - Tag generation and matching for content.
 
 This module provides:
 - Tag extraction from content using LLM
-- Tag matching against user interests
+- Tag matching against user interests (UnifiedNode)
 - Automatic tag inference
 - Cross-domain detection
 """
 import json
 import re
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Any, Callable
 
 from .types import (
     InterestTag,
+    UnifiedNode,
     InterestCategory,
     TagSource,
     ContentProfile,
@@ -129,7 +130,7 @@ Return ONLY valid JSON, no markdown formatting.
                 key_concepts=parsed.get("key_concepts", []),
                 language=self._detect_language(body)
             )
-        except (json.JSONDecodeError, Exception) as e:
+        except (json.JSONDecodeError, Exception):
             # Fallback to rule-based
             return self._extract_rule_based(entry, feed, body, preview)
 
@@ -272,7 +273,7 @@ Return ONLY valid JSON, no markdown formatting.
 
 
 class TagMatcher:
-    """Match content tags against user interests with cross-domain detection."""
+    """Match content tags against user interests (UnifiedNode) with cross-domain detection."""
 
     def __init__(self):
         pass
@@ -280,7 +281,7 @@ class TagMatcher:
     def calculate_priority(
         self,
         content_tags: List[InterestTag],
-        user_interests: List[Any],
+        user_interests: List[UnifiedNode],
         content_text: str = "",
         decay_factor: float = 0.9
     ) -> int:
@@ -288,7 +289,7 @@ class TagMatcher:
 
         Args:
             content_tags: Tags extracted from content
-            user_interests: User's tracked interests
+            user_interests: User's tracked interests (UnifiedNodes)
             content_text: Full content text for domain detection
             decay_factor: Decay factor for non-exact matches
 
@@ -312,20 +313,20 @@ class TagMatcher:
             score = 0.0
 
             # Exact tag name match
-            if interest.tag.name.lower() in content_tag_names:
-                score = interest.relevance_score * interest.priority / 5.0
+            if interest.name.lower() in content_tag_names:
+                score = interest.interest_level * interest.interest_priority / 5.0
             # Category match
-            elif interest.tag.category in content_categories:
-                score = interest.relevance_score * interest.priority / 10.0
+            elif interest.category in content_categories:
+                score = interest.interest_level * interest.interest_priority / 10.0
             # Cross-domain match
             elif detected_domains:
                 score = self._cross_domain_match(interest, detected_domains, decay_factor)
             # Fuzzy match (substring)
             else:
                 for content_tag in content_tags:
-                    if (content_tag.name in interest.tag.name or
-                        interest.tag.name in content_tag.name):
-                        score = interest.relevance_score * decay_factor * interest.priority / 10.0
+                    if (content_tag.name in interest.name or
+                        interest.name in content_tag.name):
+                        score = interest.interest_level * decay_factor * interest.interest_priority / 10.0
                         break
 
             max_match_score = max(max_match_score, score)
@@ -335,22 +336,22 @@ class TagMatcher:
 
     def _cross_domain_match(
         self,
-        interest: Any,
+        interest: UnifiedNode,
         detected_domains: List[Dict],
         decay_factor: float
     ) -> float:
         """Calculate cross-domain match score.
 
         Args:
-            interest: User interest to match
+            interest: User interest (UnifiedNode) to match
             detected_domains: Domains detected in content
             decay_factor: Decay factor
 
         Returns:
             Match score from 0.0 to 1.0
         """
-        interest_name_lower = interest.tag.name.lower()
-        interest_category_lower = interest.tag.category.value if hasattr(interest.tag.category, 'value') else str(interest.tag.category)
+        interest_name_lower = interest.name.lower()
+        interest_category_lower = interest.category.value if hasattr(interest.category, 'value') else str(interest.category)
 
         # Check if any detected domain matches the interest's category
         for domain_info in detected_domains:
@@ -358,20 +359,20 @@ class TagMatcher:
 
             # Direct domain name match
             if interest_name_lower in domain.lower():
-                return interest.relevance_score * interest.priority / 5.0
+                return interest.interest_level * interest.interest_priority / 5.0
 
             # Check cross-domain parents
             cross_parents = get_cross_domain_parents(domain)
 
             # If interest's category is a cross-domain parent
             if interest_category_lower in cross_parents:
-                return interest.relevance_score * interest.priority / 6.0 * domain_info["score"]
+                return interest.interest_level * interest.interest_priority / 6.0 * domain_info["score"]
 
             # Check cross-domain relationship via Wu-Palmer similarity
             for cross_parent in cross_parents:
                 cross_score = calculate_cross_domain_score(interest_name_lower, cross_parent.lower())
                 if cross_score > 0.3:
-                    return interest.relevance_score * cross_score * interest.priority / 5.0 * domain_info["score"]
+                    return interest.interest_level * cross_score * interest.interest_priority / 5.0 * domain_info["score"]
 
         return 0.0
 
@@ -418,14 +419,14 @@ class TagMatcher:
     def find_matching_interests(
         self,
         content_tags: List[InterestTag],
-        user_interests: List[Any],
+        user_interests: List[UnifiedNode],
         content_text: str = ""
     ) -> List[Dict[str, Any]]:
         """Find matching user interests for content tags with cross-domain support.
 
         Args:
             content_tags: Tags extracted from content
-            user_interests: User's tracked interests
+            user_interests: User's tracked interests (UnifiedNodes)
             content_text: Full content text for domain detection
 
         Returns:
@@ -444,10 +445,10 @@ class TagMatcher:
                 match_type = "exact"
 
                 # Exact match
-                if content_tag.name.lower() == interest.tag.name.lower():
+                if content_tag.name.lower() == interest.name.lower():
                     match_score = 1.0
                 # Category match
-                elif content_tag.category == interest.tag.category:
+                elif content_tag.category == interest.category:
                     match_score = 0.5
                 # Cross-domain match
                 elif cross_domain_tags:
@@ -456,7 +457,7 @@ class TagMatcher:
                         match_score = cross_score
                         match_type = "cross_domain"
                 # Related match
-                elif self._are_related(content_tag.name, interest.tag.name):
+                elif self._are_related(content_tag.name, interest.name):
                     match_score = 0.3
                     match_type = "related"
 
@@ -464,7 +465,7 @@ class TagMatcher:
                     matches.append({
                         "content_tag": content_tag,
                         "user_interest": interest,
-                        "match_score": match_score * interest.relevance_score,
+                        "match_score": match_score * interest.interest_level,
                         "match_type": match_type,
                     })
 

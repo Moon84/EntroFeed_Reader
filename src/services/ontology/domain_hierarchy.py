@@ -36,7 +36,7 @@ warnings.warn(
     stacklevel=2
 )
 
-from typing import Dict, List, Set
+from typing import Dict, List
 
 # Domain Hierarchy Definition
 # Each domain has: level, description, aliases (EN/CN), parent, children

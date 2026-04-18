@@ -5,6 +5,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Mapping, Optional, Sequence
 import json
+import os
 
 from dotenv import load_dotenv
 
@@ -24,7 +25,7 @@ from src.models.feed import Feed
 from src.models.health import HealthCheck
 from src.services.feed.service import EntroFeedRSS
 from src.scheduler import get_scheduler, setup_rss_polling, setup_daily_tasks
-from src.settings import GlobalSettings, Themes
+from src.settings import GlobalSettings
 
 JSON = "application/json"
 
@@ -127,8 +128,13 @@ async def root():
     return RedirectResponse("/_app/")
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/favicon.svg", include_in_schema=False)
 async def favicon():
+    return FileResponse(base_path / "src" / "static" / "icons" / "favicon.svg")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_ico():
     return FileResponse(base_path / "src" / "static" / "icons" / "favicon.ico")
 
 
@@ -958,6 +964,88 @@ async def llm_usage():
     from src.agents.entrofeed_agent import TokenTracker
     return {"today": TokenTracker.get_today_usage(),
             "history": TokenTracker.get_usage_history(days=7)}
+
+
+@app.get("/api/llm/providers")
+async def llm_providers():
+    """Get all available LLM providers and their models with capabilities."""
+    from src.plugins.llm import (
+        LLMPluginRegistry, MODEL_CATALOG, _get_provider_display_name
+    )
+    
+    providers = []
+    for provider_id in LLMPluginRegistry.list_handlers():
+        # Skip internal handlers
+        if provider_id in ("dummy_llm", "null_llm", "dashscope_vision"):
+            continue
+            
+        handler_cls = LLMPluginRegistry.get_handler(provider_id)
+        if not handler_cls:
+            continue
+            
+        # Check availability
+        required_env = getattr(handler_cls, "required_env", [])
+        missing_env = [e for e in required_env if not os.getenv(e)]
+        available = len(missing_env) == 0
+        
+        # Get models for this provider
+        models = MODEL_CATALOG.get_models_by_provider(provider_id)
+        if not models:
+            # Create default model info if not in catalog
+            models = [{
+                "name": handler_cls.__dict__.get("model", "default"),
+                "display_name": _get_provider_display_name(provider_id),
+                "provider": provider_id,
+                "capabilities": ["text"],
+                "description": f"{_get_provider_display_name(provider_id)} model",
+                "pricing_hint": "",
+            }]
+        
+        providers.append({
+            "id": provider_id,
+            "name": _get_provider_display_name(provider_id),
+            "available": available,
+            "missing_env": missing_env,
+            "models": [
+                {
+                    "name": m.name if hasattr(m, 'name') else str(m.get('name', '')),
+                    "display_name": m.display_name if hasattr(m, 'display_name') else str(m.get('display_name', '')),
+                    "capabilities": [c.value if hasattr(c, 'value') else str(c) for c in m.capabilities],
+                    "description": m.description if hasattr(m, 'description') else str(m.get('description', '')),
+                    "pricing_hint": m.pricing_hint if hasattr(m, 'pricing_hint') else str(m.get('pricing_hint', '')),
+                    "context_window": m.context_window if hasattr(m, 'context_window') else 0,
+                }
+                for m in models
+            ],
+        })
+    
+    return {"providers": providers}
+
+
+@app.get("/api/llm/models")
+async def llm_models(provider: str = None):
+    """Get models, optionally filtered by provider."""
+    from src.plugins.llm import MODEL_CATALOG
+    
+    if provider:
+        models = MODEL_CATALOG.get_models_by_provider(provider)
+    else:
+        models = MODEL_CATALOG.get_all_models()
+    
+    return {
+        "models": [
+            {
+                "name": m.name,
+                "display_name": m.display_name,
+                "provider": m.provider,
+                "capabilities": [c.value for c in m.capabilities],
+                "description": m.description,
+                "pricing_hint": m.pricing_hint,
+                "context_window": m.context_window,
+            }
+            for m in models
+        ]
+    }
 
 
 @app.get("/metrics")

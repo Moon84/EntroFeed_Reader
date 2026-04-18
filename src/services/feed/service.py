@@ -243,7 +243,6 @@ class EntroFeedRSS:
 
     def _check_feed_sync(self, feed: Feed):
         """Synchronous version of _check_feed for thread pool execution."""
-        import threading
         now = int(datetime.now(tz=timezone.utc).timestamp())
         logger.info(f"Polling feed (sync) {feed.id}: {feed.name}")
 

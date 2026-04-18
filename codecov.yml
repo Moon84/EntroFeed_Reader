@@ -1,0 +1,39 @@
+codecov:
+  require_ci_to_pass: false
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        # Basic coverage threshold
+        target: auto
+        threshold: 1%
+        
+      backend:
+        paths:
+          - src/
+        target: 80%
+        
+      frontend:
+        flags:
+          - frontend
+        paths:
+          - frontend/
+
+  parsers:
+    javascript:
+      enable: true
+
+  ignore:
+    - "*/tests/*"
+    - "*/test*"
+    - "**/*_test.py"
+    - "**/conftest.py"
+    - "docs/**"
+    - "scripts/**"
+    - "frontend/src/**/*.test.*"
+    - "frontend/src/**/*.spec.*"

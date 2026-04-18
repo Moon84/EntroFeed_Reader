@@ -30,7 +30,7 @@ async def test_health_check(client):
 @pytest.mark.asyncio
 async def test_about_endpoint(client):
     """Test about endpoint returns app info."""
-    response = await client.get("/about", headers={"accept": "application/json"})
+    response = await client.get("/api/about", headers={"accept": "application/json"})
     assert response.status_code == 200
     data = response.json()
     assert "settings" in data
@@ -59,11 +59,13 @@ async def test_list_handlers_endpoint(client):
 @pytest.mark.asyncio
 async def test_settings_endpoint_json(client):
     """Test settings endpoint returns JSON."""
-    response = await client.get("/settings/", headers={"accept": "application/json"})
+    response = await client.get(
+        "/settings/dummy_llm", headers={"accept": "application/json"}
+    )
     assert response.status_code == 200
     data = response.json()
-    assert "settings" in data
-    assert "themes" in data
+    assert "handler" in data
+    assert "schema" in data
 
 
 @pytest.mark.asyncio
@@ -142,10 +144,7 @@ async def test_entry_state_update(client):
     """Test entry state update endpoint."""
     # Test with non-existent entry
     # Note: TinyDB storage doesn't support update_feed_entry_state
-    response = await client.patch(
-        "/api/entries/nonexistent-id",
-        json={"is_read": True}
-    )
+    response = await client.patch("/api/entries/nonexistent-id", json={"is_read": True})
     # TinyDB may throw error, SQLite returns 404
     assert response.status_code in [200, 201, 404, 500]
 
@@ -184,30 +183,31 @@ async def test_import_opml_invalid_file(client):
     """Test OPML import with invalid file."""
     response = await client.post(
         "/api/import_opml/",
-        files={"file": ("test.xml", b"invalid content", "text/xml")}
+        files={"file": ("test.xml", b"invalid content", "text/xml")},
     )
-    # May redirect (303), reject (400/422), or error (500)
-    assert response.status_code in [303, 400, 422, 500]
+    # Returns 200 with error status in body (endpoint catches exceptions)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "error"
 
 
 @pytest.mark.asyncio
 async def test_create_agent_session(client):
     """Test creating a new agent session."""
     response = await client.post("/api/agent/sessions", json={})
-    assert response.status_code == 201
+    assert response.status_code == 200
     data = response.json()
     assert "id" in data
 
 
 @pytest.mark.asyncio
 async def test_agent_chat_without_session(client):
-    """Test agent chat requires session_id."""
+    """Test agent chat creates new session when session_id is None."""
     response = await client.post(
-        "/api/agent/chat",
-        json={"message": "hello", "session_id": None}
+        "/api/agent/chat", json={"message": "hello", "session_id": None}
     )
-    # Should require session_id - may return 400, 422, or 500 if LLM not configured
-    assert response.status_code in [400, 422, 500]
+    # Creates a new session when session_id is None
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio

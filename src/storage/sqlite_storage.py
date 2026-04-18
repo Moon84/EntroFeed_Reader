@@ -6,16 +6,13 @@ This module provides a complete storage implementation using:
 - ChromaDB for vector storage (embeddings)
 """
 import json
-import os
 import sqlite3
 from datetime import datetime
-from pathlib import Path
 from time import time
-from typing import Any, Dict, List, Mapping, Optional, Type
+from typing import Dict, List, Mapping, Optional, Type
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from pydantic import BaseModel
 
 from src.constants import DATA_DIR
 from src.plugins.storage.handler import StorageHandler

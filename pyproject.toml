@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "entrofeed"
-version = "0.3.8"
+version = "1.0.1"
 description = "An intelligent feed reader with LLM-powered recommendations"
 requires-python = ">=3.11"
 license = {text = "AGPL-3.0"}
@@ -19,13 +19,13 @@ maintainers = [
 ]
 
 classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: End Users/Desktop",
-  "Topic :: Office/Business :: News/Diary",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Office/Business :: News/Diary",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
 dependencies = [
@@ -73,9 +73,9 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/Moon84/EntroFeed_Reader"
 "Bug Reports" = "https://github.com/Moon84/EntroFeed_Reader/issues"
-"Funding" = "https://donate.pypi.org"
-"Say Thanks!" = "http://saythanks.io/to/example"
 "Source" = "https://github.com/Moon84/EntroFeed_Reader/"
+"Discussions" = "https://github.com/Moon84/EntroFeed_Reader/discussions"
+"Changelog" = "https://github.com/Moon84/EntroFeed_Reader/blob/main/CHANGELOG.md"
 
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.

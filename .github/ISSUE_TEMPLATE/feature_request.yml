@@ -1,0 +1,72 @@
+name: Feature Request ✨
+description: Suggest a new feature or enhancement
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the template below.
+        
+        For general questions or discussions, please use [GitHub Discussions](https://github.com/Moon84/EntroFeed_Reader/discussions) instead.
+
+  - type: checkboxes
+    id: search-check
+    attributes:
+      label: I have checked the existing issues and discussions
+      description: Please search existing issues and feature requests before submitting
+      options:
+        - label: Yes, I searched and found no similar suggestions
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: |
+        Describe the problem this feature would solve.
+        What user pain point does it address?
+      placeholder: |
+        I want to be able to do X, but currently I have to do Y which is inconvenient...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: |
+        Describe what you would like to happen.
+        How should this feature work?
+      placeholder: |
+        This feature should allow me to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: |
+        Describe any alternative solutions or features you've considered.
+      placeholder: |
+        I considered using X, but...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, or screenshots about the feature request here
+      placeholder: |
+        Here's a mockup of how this could look...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: |
+        By submitting this issue, you agree to abide by our [Code of Conduct](https://github.com/Moon84/EntroFeed_Reader/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow the Code of Conduct
+          required: true

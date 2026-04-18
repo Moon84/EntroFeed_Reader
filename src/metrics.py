@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from typing import Optional
+
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # Token usage metrics
@@ -23,6 +24,13 @@ LLM_REQUEST_DURATION = Histogram(
     "LLM request duration",
     ["provider", "model"],
     buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+)
+
+# Cost tracking metrics
+LLM_COST_USD = Counter(
+    "entrofeed_llm_cost_usd",
+    "Estimated LLM cost in USD",
+    ["provider", "model"]
 )
 
 # Feed metrics
@@ -72,6 +80,29 @@ PLUGIN_OPERATIONS = Counter(
 )
 
 
+# Pricing lookup for cost estimation (价格估算)
+LLM_PRICING = {
+    # Provider: {Model: (input_cost_per_1k, output_cost_per_1k)}
+    "deepseek": {
+        "deepseek-chat": (0.001, 0.001),  # $0.001/1K tokens
+    },
+    "zhipu": {
+        "glm-4": (0.0001, 0.0001),  # ¥0.1/1K tokens ~= $0.00014
+    },
+    "moonshot": {
+        "moonshot-v1-128k": (0.000012, 0.000012),  # ¥0.012/1K tokens
+    },
+    "dashscope": {
+        "qwen-plus": (0.000004, 0.000004),  # ¥0.004/1K tokens
+        "qwen-max": (0.00012, 0.00012),  # ¥0.12/1K tokens
+    },
+    "openai": {
+        "gpt-4o-mini": (0.00015, 0.0006),  # $0.15/1M input, $0.6/1M output
+        "gpt-4o": (0.0025, 0.01),  # $2.5/1M input, $10/1M output
+    },
+}
+
+
 @dataclass
 class PluginCheckResult:
     """Result of plugin availability check."""
@@ -97,9 +128,23 @@ def record_llm_request(provider: str, model: str, success: bool, duration: float
     LLM_REQUEST_DURATION.labels(provider=provider, model=model).observe(duration)
 
 
+def record_llm_cost(provider: str, model: str, input_tokens: int, output_tokens: int):
+    """Record LLM cost in USD based on token usage.
+    
+    Args:
+        provider: LLM provider ID (e.g., 'deepseek', 'dashscope')
+        model: Model name (e.g., 'deepseek-chat', 'qwen-plus')
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+    """
+    if provider in LLM_PRICING and model in LLM_PRICING[provider]:
+        input_cost, output_cost = LLM_PRICING[provider][model]
+        total_cost = (input_tokens * input_cost + output_tokens * output_cost) / 1000
+        LLM_COST_USD.labels(provider=provider, model=model).inc(total_cost)
+
+
 def record_plugin_init(plugin_type: str, plugin_id: str, duration: float, success: bool):
     """Record plugin initialization."""
-    status = "success" if success else "error"
     PLUGIN_OPERATIONS.labels(plugin_type=plugin_type, plugin_id=plugin_id, operation="init").inc()
     PLUGIN_INIT_DURATION.labels(plugin_type=plugin_type, plugin_id=plugin_id).observe(duration)
     PLUGIN_STATUS.labels(plugin_type=plugin_type, plugin_id=plugin_id).set(1 if success else 0)

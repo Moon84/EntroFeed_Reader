@@ -14,11 +14,12 @@ from typing import Dict, List, Optional, Any, Callable
 
 from .memory import OntologyMemory
 from .types import (
+    UnifiedNode,
     InterestTag,
-    UserInterest,
     ContentProfile,
     InterestCategory,
     TagSource,
+    FollowUpStatus,
 )
 from .tagging import TagGenerator, TagMatcher
 from .evaluation import (
@@ -94,7 +95,7 @@ class OntologyRegistry:
         profile = self.tag_generator.extract_tags(entry, feed, content)
 
         # Calculate priority based on user interests
-        user_interests = self.memory.get_all_user_interests()
+        user_interests = self.memory.get_user_interests()
         priority = self.priority_evaluator.evaluate_content_priority(
             profile,
             user_interests
@@ -135,24 +136,25 @@ class OntologyRegistry:
     def get_user_interests(
         self,
         category: InterestCategory = None
-    ) -> List[UserInterest]:
+    ) -> List[UnifiedNode]:
         """Get user interests.
 
         Args:
             category: Optional category filter
 
         Returns:
-            List of UserInterest
+            List of UnifiedNode with is_interest=True
         """
+        interests = self.memory.get_user_interests()
         if category:
-            return self.memory.get_user_interests_by_category(category)
-        return self.memory.get_all_user_interests()
+            return [i for i in interests if i.category == category]
+        return interests
 
     def add_interest(
         self,
         tag: InterestTag,
         priority: int = 3
-    ) -> UserInterest:
+    ) -> UnifiedNode:
         """Add explicit user interest.
 
         Args:
@@ -160,16 +162,17 @@ class OntologyRegistry:
             priority: Initial priority (0-5)
 
         Returns:
-            Created UserInterest
+            Created UnifiedNode with is_interest=True
         """
-        tag.source = TagSource.EXPLICIT
-        interest = UserInterest(
-            tag=tag,
-            priority=priority,
-            relevance_score=0.8 if tag.source == TagSource.EXPLICIT else 0.3
-        )
-        self.memory.save_user_interest(interest)
-        return interest
+        # Convert to unified node
+        node = UnifiedNode.from_interest_tag(tag)
+        node.is_interest = True
+        node.interest_priority = priority
+        node.interest_level = 0.8 if tag.source == TagSource.EXPLICIT else 0.3
+        node.source = TagSource.EXPLICIT
+
+        self.memory.save_node(node)
+        return node
 
     def remove_interest(self, interest_id: str) -> bool:
         """Remove user interest.
@@ -180,13 +183,13 @@ class OntologyRegistry:
         Returns:
             True if removed
         """
-        return self.memory.delete_user_interest(interest_id)
+        return self.memory.delete_node(interest_id)
 
     def update_interest_priority(
         self,
         interest_id: str,
         priority: int
-    ) -> Optional[UserInterest]:
+    ) -> Optional[UnifiedNode]:
         """Update interest priority.
 
         Args:
@@ -194,12 +197,32 @@ class OntologyRegistry:
             priority: New priority (0-5)
 
         Returns:
-            Updated interest or None
+            Updated UnifiedNode or None
         """
-        interest = self.memory.get_user_interest(interest_id)
+        interest = self.memory.get_node(interest_id)
         if interest:
-            interest.priority = max(0, min(5, priority))
-            self.memory.save_user_interest(interest)
+            interest.interest_priority = max(0, min(5, priority))
+            self.memory.save_node(interest)
+        return interest
+
+    def update_interest_follow_up(
+        self,
+        interest_id: str,
+        status: FollowUpStatus
+    ) -> Optional[UnifiedNode]:
+        """Update interest follow-up status.
+
+        Args:
+            interest_id: ID of interest
+            status: New follow-up status
+
+        Returns:
+            Updated UnifiedNode or None
+        """
+        interest = self.memory.get_node(interest_id)
+        if interest:
+            interest.set_follow_up(status)
+            self.memory.save_node(interest)
         return interest
 
     # ============ Reading Behavior ============
@@ -221,7 +244,7 @@ class OntologyRegistry:
         if not profile:
             return
 
-        user_interests = self.memory.get_all_user_interests()
+        user_interests = self.memory.get_user_interests()
 
         # Update interests
         updated = self.interest_updater.update_interests_on_read(
@@ -230,9 +253,10 @@ class OntologyRegistry:
             user_interests
         )
 
-        # Save updated interests
+        # Save updated interests (now UnifiedNodes)
         for interest in updated:
-            self.memory.save_user_interest(interest)
+            if isinstance(interest, UnifiedNode):
+                self.memory.save_node(interest)
 
     def on_entry_liked(
         self,
@@ -251,7 +275,7 @@ class OntologyRegistry:
         if not profile or not profile.tags:
             return
 
-        user_interests = self.memory.get_all_user_interests()
+        user_interests = self.memory.get_user_interests()
 
         # Update interests with like boost
         updated = self.interest_updater.update_interests_on_like(
@@ -260,9 +284,10 @@ class OntologyRegistry:
             is_favorited=is_favorited
         )
 
-        # Save updated interests
+        # Save updated interests (now UnifiedNodes)
         for interest in updated:
-            self.memory.save_user_interest(interest)
+            if isinstance(interest, UnifiedNode):
+                self.memory.save_node(interest)
 
     def on_entry_disliked(self, entry_id: str) -> None:
         """Handle entry disliked event.
@@ -276,7 +301,7 @@ class OntologyRegistry:
         if not profile or not profile.tags:
             return
 
-        user_interests = self.memory.get_all_user_interests()
+        user_interests = self.memory.get_user_interests()
 
         # Update interests with dislike decay
         updated = self.interest_updater.update_interests_on_dislike(
@@ -284,9 +309,10 @@ class OntologyRegistry:
             user_interests
         )
 
-        # Save updated interests
+        # Save updated interests (now UnifiedNodes)
         for interest in updated:
-            self.memory.save_user_interest(interest)
+            if isinstance(interest, UnifiedNode):
+                self.memory.save_node(interest)
 
     def run_daily_batch_update(self) -> Dict[str, Any]:
         """Daily batch: process liked/disliked entries, extract entities with LLM.
@@ -381,7 +407,7 @@ class OntologyRegistry:
         # If profile exists and is fresh, skip LLM extraction
         if profile and profile.tags and len(profile.tags) >= 3:
             # Just update existing tags based on sentiment
-            user_interests = self.memory.get_all_user_interests()
+            user_interests = self.memory.get_user_interests()
             if sentiment == "positive":
                 updated = self.interest_updater.update_interests_on_like(
                     profile.tags, user_interests
@@ -391,7 +417,7 @@ class OntologyRegistry:
                     profile.tags, user_interests
                 )
             for interest in updated:
-                self.memory.save_user_interest(interest)
+                self.memory.save_node(interest)
             return
 
         # Need LLM extraction - use the configured LLM handler
@@ -402,7 +428,7 @@ class OntologyRegistry:
         except Exception:
             # Fallback: just update based on existing profile
             if profile and profile.tags:
-                user_interests = self.memory.get_all_user_interests()
+                user_interests = self.memory.get_user_interests()
                 if sentiment == "positive":
                     updated = self.interest_updater.update_interests_on_like(
                         profile.tags, user_interests
@@ -412,7 +438,7 @@ class OntologyRegistry:
                         profile.tags, user_interests
                     )
                 for interest in updated:
-                    self.memory.save_user_interest(interest)
+                    self.memory.save_node(interest)
             return
 
         prompt = f"""Extract entities and topics from this article.
@@ -484,7 +510,7 @@ If no clear entities found, return []."""
                 tags.append(tag)
 
             # Update user interests based on sentiment
-            user_interests = self.memory.get_all_user_interests()
+            user_interests = self.memory.get_user_interests()
 
             if sentiment == "positive":
                 updated = self.interest_updater.update_interests_on_like(tags, user_interests)
@@ -492,7 +518,7 @@ If no clear entities found, return []."""
                 updated = self.interest_updater.update_interests_on_dislike(tags, user_interests)
 
             for interest in updated:
-                self.memory.save_user_interest(interest)
+                self.memory.save_node(interest)
 
         except Exception as e:
             import logging
@@ -504,11 +530,11 @@ If no clear entities found, return []."""
         Args:
             days: Number of days to simulate decay for
         """
-        interests = self.memory.get_all_user_interests()
+        interests = self.memory.get_user_interests()
         decayed = self.interest_updater.decay_interests(interests, days)
 
         for interest in decayed:
-            self.memory.save_user_interest(interest)
+            self.memory.save_node(interest)
 
     # ============ Interest Inference ============
 
@@ -528,7 +554,7 @@ If no clear entities found, return []."""
         """
         # Get recent profiles
         recent = self.memory.get_recent_profiles(limit=50)
-        existing = self.memory.get_all_user_interests()
+        existing = self.memory.get_user_interests()
 
         # Infer
         inferred = self.interest_inferrer.infer_from_reading_history(
@@ -543,7 +569,7 @@ If no clear entities found, return []."""
         self,
         tag: InterestTag,
         priority: int = 2
-    ) -> UserInterest:
+    ) -> UnifiedNode:
         """Accept an inferred interest as explicit.
 
         Args:
@@ -551,7 +577,7 @@ If no clear entities found, return []."""
             priority: Initial priority
 
         Returns:
-            Created UserInterest
+            UnifiedNode with is_interest=True
         """
         tag.source = TagSource.EXPLICIT
         return self.add_interest(tag, priority)
@@ -630,7 +656,7 @@ If no clear entities found, return []."""
         self,
         file_path: str = None,
         use_llm: bool = True
-    ) -> List[UserInterest]:
+    ) -> List[UnifiedNode]:
         """Initialize user interests from a user.md file.
 
         This method reads the user's profile description from a markdown file
@@ -641,10 +667,8 @@ If no clear entities found, return []."""
             use_llm: Whether to use LLM for extraction (required)
 
         Returns:
-            List of created UserInterest objects
+            List of created UnifiedNodes with is_interest=True
         """
-        import re
-        import json
         from pathlib import Path
         from src.constants import DATA_DIR
 
@@ -663,8 +687,8 @@ If no clear entities found, return []."""
             return []
 
         # Check if already initialized (file hasn't changed)
-        existing_interests = self.memory.get_all_user_interests()
-        explicit_interests = [i for i in existing_interests if i.tag.source == TagSource.EXPLICIT]
+        existing_interests = self.memory.get_user_interests()
+        explicit_interests = [i for i in existing_interests if i.source == TagSource.EXPLICIT]
         if explicit_interests:
             # Already has explicit interests, skip initialization
             return explicit_interests
@@ -675,7 +699,7 @@ If no clear entities found, return []."""
         else:
             extracted = self._extract_interests_rule_based(content)
 
-        # Create and save UserInterest objects
+        # Create and save UnifiedNode objects (is_interest=True)
         created = []
         for item in extracted:
             tag = InterestTag(
@@ -699,11 +723,11 @@ If no clear entities found, return []."""
         This adds user interests as nodes in the domain graph and resolves
         them via Wikidata if not already present.
         """
-        user_interests = self.memory.get_all_user_interests()
+        user_interests = self.memory.get_user_interests()
 
         for interest in user_interests:
-            tag_name = interest.tag.name
-            qid = interest.tag.wikidata_qid
+            tag_name = interest.name
+            qid = interest.wikidata_qid
 
             # If already has QID, check if in graph
             if qid:
@@ -719,10 +743,10 @@ If no clear entities found, return []."""
                     language="en"
                 )
 
-                # Update interest tag with resolved QID if it changed
+                # Update interest with resolved QID if it changed
                 if resolved_qid and resolved_qid != qid:
-                    interest.tag.wikidata_qid = resolved_qid
-                    self.memory.save_user_interest(interest)
+                    interest.wikidata_qid = resolved_qid
+                    self.memory.save_node(interest)
 
             except Exception as e:
                 import logging
@@ -939,19 +963,19 @@ Return ONLY valid JSON array, no markdown formatting, no other text. If no clear
             "path": str(user_md_path),
         }
 
-    def reinitialize_interests_from_profile(self) -> List[UserInterest]:
+    def reinitialize_interests_from_profile(self) -> List[UnifiedNode]:
         """Re-read user.md and re-initialize user interests.
 
         This clears existing EXPLICIT interests and re-extracts from user.md.
 
         Returns:
-            List of newly created UserInterest objects
+            List of newly created UnifiedNodes with is_interest=True
         """
         # Clear existing explicit interests
-        existing = self.memory.get_all_user_interests()
+        existing = self.memory.get_user_interests()
         for interest in existing:
-            if interest.tag.source == TagSource.EXPLICIT:
-                self.memory.delete_user_interest(interest.id)
+            if interest.source == TagSource.EXPLICIT:
+                self.memory.delete_node(interest.id)
 
         # Re-read profile and extract
         content = self.read_user_profile()

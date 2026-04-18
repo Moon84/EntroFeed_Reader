@@ -11,8 +11,14 @@
 [![React](https://img.shields.io/badge/react-18.x-61dafb.svg)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/fastapi-0.109+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
+[![Tests](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/test.yml/badge.svg)](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Moon84/EntroFeed_Reader/branch/main/graph/badge.svg)](https://codecov.io/gh/Moon84/EntroFeed_Reader)
+[![CodeQL](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/security.yml/badge.svg)](https://github.com/Moon84/EntroFeed_Reader/actions/workflows/security.yml)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/Moon84/EntroFeed_Reader/security/dependabot)
+[![Last Commit](https://img.shields.io/github/last-commit/Moon84/EntroFeed_Reader/main)](https://github.com/Moon84/EntroFeed_Reader/commits/main)
+[![Commit Activity](https://img.shields.io/github/commit-activity/w/Moon84/EntroFeed_Reader)](https://github.com/Moon84/EntroFeed_Reader/graphs/commit-activity)
 
-![Logo](src/assets/EntroFeed_logo_w_name.png)
+![Logo](src/assets/EntroFeed_logo.svg)
 
 > **English** | [中文](README_zh.md)
 
@@ -279,13 +285,27 @@ entrofeed mcp --stdio
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for detailed information.
+
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat-square)](https://github.com/Moon84/EntroFeed_Reader/blob/main/CONTRIBUTING.md)
+[![GitHub Issues](https://img.shields.io/github/issues/Moon84/EntroFeed_Reader?logo=github)](https://github.com/Moon84/EntroFeed_Reader/issues)
+[![GitHub PRs](https://img.shields.io/github/issues-pr/Moon84/EntroFeed_Reader?logo=github)](https://github.com/Moon84/EntroFeed_Reader/pulls)
+
+### Quick Guide
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Commit your changes (`git commit -m 'feat(scope): add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Good First Issues
+
+Looking for a way to start? Check out issues labeled [`good first issue`](https://github.com/Moon84/EntroFeed_Reader/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)!
+
+### Code of Conduct
+
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
 
 ## 📄 License
 
@@ -304,6 +324,18 @@ This project is licensed under the **AGPL-3.0 License** - see the [LICENSE](LICE
 - **Author**: Yinlei Zhang
 - **Email**: wuyuezhang1984@gmail.com
 - **Issues**: [GitHub Issues](https://github.com/Moon84/EntroFeed_Reader/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Moon84/EntroFeed_Reader/discussions)
+
+---
+
+<div align="center">
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-Moon84-blue?style=flat-square&logo=github-sponsors)](https://github.com/sponsors/Moon84)
+[![Open Source Love](https://badges.frapsoft.com/os/v2/open-source.svg?v=103)](https://github.com/ellerbrock/open-source-badges/)
+
+*If you find EntroFeed helpful, please give us a ⭐ on GitHub!*
+
+</div>
 
 ---
 

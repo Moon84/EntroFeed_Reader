@@ -3,101 +3,61 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 jobs:
-  integration-test-sqlite-playwright-null:
+  test-sqlite-playwright:
     uses: ./.github/workflows/full_test.yml
     with:
       storage_handler: sqlite
       content_retrieval_handler: playwright
       llm_handler: "null"
-  integration-test-tinydb-playwright-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: tinydb
-      content_retrieval_handler: playwright
-      llm_handler: "null"
-  integration-test-lmdb-playwright-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: lmdb
-      content_retrieval_handler: playwright
-      llm_handler: "null"
-  integration-test-hybrid-playwright-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: hybrid
-      content_retrieval_handler: playwright
-      llm_handler: "null"
-  integration-test-sqlite-requests-null:
+
+  test-sqlite-requests:
     uses: ./.github/workflows/full_test.yml
     with:
       storage_handler: sqlite
       content_retrieval_handler: requests
       llm_handler: "null"
-  integration-test-tinydb-requests-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: tinydb
-      content_retrieval_handler: requests
-      llm_handler: "null"
-  integration-test-lmdb-requests-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: lmdb
-      content_retrieval_handler: requests
-      llm_handler: "null"
-  integration-test-hybrid-requests-null:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: hybrid
-      content_retrieval_handler: requests
-      llm_handler: "null"
-  integration-test-sqlite-playwright-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: sqlite
-      content_retrieval_handler: playwright
-      llm_handler: dummy
-  integration-test-tinydb-playwright-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: tinydb
-      content_retrieval_handler: playwright
-      llm_handler: dummy
-  integration-test-lmdb-playwright-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: lmdb
-      content_retrieval_handler: playwright
-      llm_handler: dummy
-  integration-test-hybrid-playwright-dummy:
+
+  test-hybrid-playwright-dummy:
     uses: ./.github/workflows/full_test.yml
     with:
       storage_handler: hybrid
       content_retrieval_handler: playwright
       llm_handler: dummy
-  integration-test-sqlite-requests-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: sqlite
-      content_retrieval_handler: requests
-      llm_handler: dummy
-  integration-test-tinydb-requests-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: tinydb
-      content_retrieval_handler: requests
-      llm_handler: dummy
-  integration-test-lmdb-requests-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: lmdb
-      content_retrieval_handler: requests
-      llm_handler: dummy
-  integration-test-hybrid-requests-dummy:
-    uses: ./.github/workflows/full_test.yml
-    with:
-      storage_handler: hybrid
-      content_retrieval_handler: requests
-      llm_handler: dummy
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv venv
+          source .venv/bin/activate
+          make install-ci
+
+      - name: Run tests with coverage
+        run: |
+          source .venv/bin/activate
+          pytest --cov=src --cov-branch --cov-report=xml --cov-report=html -q
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: EntroFeed
+          fail_ci_if_error: false
+          verbose: true

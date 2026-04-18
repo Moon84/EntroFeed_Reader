@@ -1,42 +1,87 @@
 #
 name: Publish image
 
-# This workflow runs only when a tag starting with "v" is created
 on:
   push:
     tags:
       - v*
 env:
   IMAGE_NAME: entrofeed
-#
+  PYTHON_VERSION: "3.11"
+
 jobs:
-  # This pushes the image to GitHub Packages.
-  push:
+  version-sync:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.ver }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Sync version to frontend
+        run: python scripts/bump_version.py
+
+      - name: Check for version changes
+        id: check
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update version outputs
+        id: version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,' | sed -e 's/^v//')
+          echo "ver=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit version sync
+        if: steps.check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github[bot]@users.noreply.github.com"
+          git config --local user.name "github[bot]"
+          git add frontend/package.json
+          git commit -m "chore: sync version to ${{ steps.version.outputs.ver }}"
+          git tag -a v${{ steps.version.outputs.ver }} -m "Release v${{ steps.version.outputs.ver }}"
+          git push origin v${{ steps.version.outputs.ver }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs: version-sync
     permissions:
       packages: write
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version-sync.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Sync version (in case of new commit)
+        run: python scripts/bump_version.py
 
       - name: Build image
         run: docker build . --file Dockerfile --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-        #
+
       - name: Push image
         run: |
           IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
-
-          # This changes all uppercase characters to lowercase.
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          # This strips the git ref prefix from the version.
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          # This strips the "v" prefix from the tag name.
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          # This uses the Docker `latest` tag convention.
-          [ "$VERSION" == "main" ] && VERSION=latest
+          VERSION=${{ needs.version-sync.outputs.version }}
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
           docker tag $IMAGE_NAME $IMAGE_ID:$VERSION

@@ -2,10 +2,8 @@
 """EntroFeed Agent Tools - Built-in tools for RSS/Feed operations."""
 
 import json
-import re
 import urllib.request
 import urllib.parse
-from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from src.services.ontology import get_ontology_registry
@@ -131,7 +129,6 @@ def get_user_interests(category: str = None) -> str:
     Returns:
         JSON string with user interests
     """
-    from src.services.ontology import get_ontology_registry
     from src.services.ontology.types import InterestCategory
 
     registry = get_ontology_registry()
@@ -166,7 +163,6 @@ def add_user_interest(
     Returns:
         JSON string with result
     """
-    from src.services.ontology import get_ontology_registry
     from src.services.ontology.types import InterestTag, InterestCategory, TagSource
 
     registry = get_ontology_registry()
@@ -200,7 +196,6 @@ def remove_user_interest(interest_id: str) -> str:
     Returns:
         JSON string with result
     """
-    from src.services.ontology import get_ontology_registry
 
     registry = get_ontology_registry()
     success = registry.remove_interest(interest_id)
@@ -221,7 +216,6 @@ def get_high_priority_content(min_priority: int = 3, limit: int = 10) -> str:
     Returns:
         JSON string with high priority content
     """
-    from src.services.ontology import get_ontology_registry
 
     registry = get_ontology_registry()
     profiles = registry.get_content_by_priority(
@@ -246,7 +240,6 @@ def process_content_for_user(entry_id: str) -> str:
     """
     from src.backend import EntroFeedBackend
     from src.storage.singleton import get_storage
-    from src.services.ontology import get_ontology_registry
 
     storage = get_storage()
     backend = EntroFeedBackend(db=storage)
@@ -298,7 +291,6 @@ def get_daily_digest(date: str = None) -> str:
     Returns:
         JSON string with digest
     """
-    from src.services.ontology import get_ontology_registry
 
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")

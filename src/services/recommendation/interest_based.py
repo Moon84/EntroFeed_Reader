@@ -2,10 +2,10 @@
 """
 Interest-Based Recommender - Recommend content based on user interests.
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
 
-from src.services.ontology.types import UserInterest, ContentProfile, InterestTag, InterestCategory, TagSource
+from src.services.ontology.types import UnifiedNode, ContentProfile, InterestTag, InterestCategory, TagSource
 from src.services.ontology.domain_hierarchy import (
     detect_domains_in_text,
     get_cross_domain_parents,
@@ -19,7 +19,7 @@ class InterestBasedRecommender:
 
     Uses OntologyRegistry as the primary interface to access:
     - ContentProfile (pre-computed tags and priority)
-    - UserInterest (user's tracked interests)
+    - UnifiedNode (user's tracked interests with is_interest=True)
 
     Falls back to raw entry processing only when no ContentProfile exists.
     """
@@ -68,7 +68,7 @@ class InterestBasedRecommender:
         # Sort by priority (highest first)
         sorted_interests = sorted(
             user_interests,
-            key=lambda x: (x.priority, x.relevance_score),
+            key=lambda x: (x.interest_priority, x.interest_level),
             reverse=True
         )
 
@@ -177,7 +177,7 @@ class InterestBasedRecommender:
     def _calculate_interest_score(
         self,
         profile: ContentProfile,
-        user_interests: List[UserInterest],
+        user_interests: List[UnifiedNode],
         content_text: str = ""
     ) -> float:
         """
@@ -199,21 +199,22 @@ class InterestBasedRecommender:
             detected_domains = detect_domains_in_text(content_text)
 
         for interest in user_interests:
-            tag = interest.tag
+            tag_name = interest.name
+            tag_category = interest.category
             tag_score = 0.0
             match_type = "exact"
 
             # Exact tag name match (highest weight)
-            if tag.name.lower() in profile_tag_names:
+            if tag_name.lower() in profile_tag_names:
                 tag_score = 1.0
             # Category match (medium weight)
-            elif tag.category in profile_categories:
+            elif tag_category in profile_categories:
                 tag_score = 0.5
             # Cross-domain match
             elif detected_domains:
                 cross_score = self._cross_domain_match(
-                    tag.name.lower(),
-                    tag.category.value if hasattr(tag.category, 'value') else str(tag.category),
+                    tag_name.lower(),
+                    tag_category.value if hasattr(tag_category, 'value') else str(tag_category),
                     detected_domains
                 )
                 if cross_score > 0:
@@ -222,14 +223,14 @@ class InterestBasedRecommender:
             # Fuzzy match (lower weight)
             else:
                 for pt in profile.tags:
-                    if tag.name.lower() in pt.name.lower() or pt.name.lower() in tag.name.lower():
+                    if tag_name.lower() in pt.name.lower() or pt.name.lower() in tag_name.lower():
                         tag_score = 0.3
                         match_type = "fuzzy"
                         break
 
             if tag_score > 0:
                 # Weight by priority (0-5) and relevance (0-1)
-                weight = (interest.priority / 5.0) * interest.relevance_score
+                weight = (interest.interest_priority / 5.0) * interest.interest_level
                 total_score += tag_score * weight
 
         return min(1.0, total_score)
@@ -286,7 +287,7 @@ class InterestBasedRecommender:
     def _get_matched_interest(
         self,
         profile: ContentProfile,
-        user_interests: List[UserInterest]
+        user_interests: List[UnifiedNode]
     ) -> str:
         """Get the highest-matching user interest for a profile."""
         best_match = ""
@@ -295,11 +296,11 @@ class InterestBasedRecommender:
         profile_tag_names = {t.name.lower() for t in profile.tags}
 
         for interest in user_interests:
-            if interest.tag.name.lower() in profile_tag_names:
-                score = interest.priority * interest.relevance_score
+            if interest.name.lower() in profile_tag_names:
+                score = interest.interest_priority * interest.interest_level
                 if score > best_score:
                     best_score = score
-                    best_match = interest.tag.name
+                    best_match = interest.name
 
         return best_match
 
@@ -317,7 +318,7 @@ class InterestBasedRecommender:
         self,
         entry,
         entry_tags: List,
-        user_interests: List[UserInterest],
+        user_interests: List[UnifiedNode],
         content_text: str = ""
     ) -> float:
         """
@@ -337,21 +338,22 @@ class InterestBasedRecommender:
             detected_domains = detect_domains_in_text(content_text)
 
         for interest in user_interests:
-            tag = interest.tag
+            tag_name = interest.name
+            tag_category = interest.category
             tag_score = 0.0
             match_type = "exact"
 
             # Exact tag name match (highest weight)
-            if tag.name.lower() in entry_tag_names:
+            if tag_name.lower() in entry_tag_names:
                 tag_score = 1.0
             # Category match (medium weight)
-            elif tag.category in entry_categories:
+            elif tag_category in entry_categories:
                 tag_score = 0.5
             # Cross-domain match
             elif detected_domains:
                 cross_score = self._cross_domain_match(
-                    tag.name.lower(),
-                    tag.category.value if hasattr(tag.category, 'value') else str(tag.category),
+                    tag_name.lower(),
+                    tag_category.value if hasattr(tag_category, 'value') else str(tag_category),
                     detected_domains
                 )
                 if cross_score > 0:
@@ -360,14 +362,14 @@ class InterestBasedRecommender:
             # Fuzzy match (lower weight)
             else:
                 for pt in entry_tags:
-                    if tag.name.lower() in pt.name.lower() or pt.name.lower() in tag.name.lower():
+                    if tag_name.lower() in pt.name.lower() or pt.name.lower() in tag_name.lower():
                         tag_score = 0.3
                         match_type = "fuzzy"
                         break
 
             if tag_score > 0:
                 # Weight by priority (0-5) and relevance (0-1)
-                weight = (interest.priority / 5.0) * interest.relevance_score
+                weight = (interest.interest_priority / 5.0) * interest.interest_level
                 total_score += tag_score * weight
 
         return min(1.0, total_score)
@@ -375,7 +377,7 @@ class InterestBasedRecommender:
     def _get_matched_interest_from_entry(
         self,
         entry,
-        user_interests: List[UserInterest]
+        user_interests: List[UnifiedNode]
     ) -> str:
         """Get the highest-matching user interest for an entry."""
         best_match = ""
@@ -385,11 +387,11 @@ class InterestBasedRecommender:
         entry_tag_names = {t.get("name", "").lower() for t in entry.tags} if entry.tags else set()
 
         for interest in user_interests:
-            if interest.tag.name.lower() in entry_tag_names:
-                score = interest.priority * interest.relevance_score
+            if interest.name.lower() in entry_tag_names:
+                score = interest.interest_priority * interest.interest_level
                 if score > best_score:
                     best_score = score
-                    best_match = interest.tag.name
+                    best_match = interest.name
 
         return best_match
 

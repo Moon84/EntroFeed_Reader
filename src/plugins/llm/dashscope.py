@@ -2,12 +2,14 @@
 """DashScope LLM Plugin for EntroFeed - Alibaba's Qwen models."""
 
 import os
-from typing import Any, ClassVar, List, Dict, Optional
+import time
+from typing import Any, ClassVar, Dict, List, Optional
 
 from openai import OpenAI
 from pydantic import Field
 
 from src.handlers import LLMHandler
+from src.metrics import record_llm_request, record_token_usage
 from src.models.feed import Feed, FeedEntry
 from src.plugins.llm import ModelWrapperBase, LLMPluginRegistry
 
@@ -30,13 +32,12 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
         """Check if DashScope API is reachable."""
         import requests
         try:
-            # Lightweight check - just verify the API endpoint is reachable
             resp = requests.get(
                 "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
                 timeout=5,
                 headers={"Authorization": f"Bearer {os.getenv('DASHSCOPE_API_KEY', '')}"}
             )
-            return resp.status_code in (200, 401)  # 401 means auth issue, but API is reachable
+            return resp.status_code in (200, 401)
         except requests.RequestException:
             return False
 
@@ -51,15 +52,26 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
 
         client = OpenAI(api_key=api_key, base_url=self.base_url)
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            **kwargs
-        )
-
-        return response.choices[0].message.content
+        start_time = time.time()
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                **kwargs
+            )
+            
+            # Record metrics
+            usage = response.usage
+            if usage:
+                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+            record_llm_request(self.id, self.model, True, time.time() - start_time)
+            
+            return response.choices[0].message.content
+        except Exception:
+            record_llm_request(self.id, self.model, False, time.time() - start_time)
+            raise
 
     def summarize(self, feed: Feed, entry: FeedEntry, mk: str) -> str:
         """Summarize content using DashScope."""
@@ -95,32 +107,43 @@ class DashScopeLLMHandler(ModelWrapperBase, LLMHandler):
                 }
             })
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            tools=dashscope_tools,
-            tool_choice="auto",
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            **kwargs
-        )
+        start_time = time.time()
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=dashscope_tools,
+                tool_choice="auto",
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                **kwargs
+            )
 
-        message = response.choices[0].message
-        result: Dict[str, Any] = {"content": message.content or ""}
+            # Record metrics
+            usage = response.usage
+            if usage:
+                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+            record_llm_request(self.id, self.model, True, time.time() - start_time)
 
-        if message.tool_calls:
-            result["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
+            message = response.choices[0].message
+            result: Dict[str, Any] = {"content": message.content or ""}
+
+            if message.tool_calls:
+                result["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
                     }
-                }
-                for tc in message.tool_calls
-            ]
+                    for tc in message.tool_calls
+                ]
 
-        return result
+            return result
+        except Exception:
+            record_llm_request(self.id, self.model, False, time.time() - start_time)
+            raise
 
 
 class DashScopeVisionHandler(ModelWrapperBase, LLMHandler):
@@ -141,13 +164,24 @@ class DashScopeVisionHandler(ModelWrapperBase, LLMHandler):
 
         client = OpenAI(api_key=api_key, base_url=self.base_url)
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            **kwargs
-        )
+        start_time = time.time()
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                **kwargs
+            )
 
-        return response.choices[0].message.content
+            # Record metrics
+            usage = response.usage
+            if usage:
+                record_token_usage(self.model, usage.prompt_tokens, usage.completion_tokens)
+            record_llm_request(self.id, self.model, True, time.time() - start_time)
+
+            return response.choices[0].message.content
+        except Exception:
+            record_llm_request(self.id, self.model, False, time.time() - start_time)
+            raise
 
     def summarize(self, feed: Feed, entry: FeedEntry, mk: str) -> str:
         """Summarize/describe image using DashScope vision model."""
