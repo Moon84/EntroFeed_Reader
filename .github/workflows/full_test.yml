@@ -30,20 +30,18 @@ jobs:
         uses: actions/checkout@v4
       - name: install
         run: |
-          pip install uv && uv venv
-          source .venv/bin/activate
-          make install-ci
+          pip install uv
+          uv venv
+          .venv/bin/uv pip install .
       - name: unit_test
         run: |
-          source .venv/bin/activate
-          make unit-test
+          .venv/bin/python -m pytest tests/ -q
           make clean
       - name: integration_test
         run: |
-          source .venv/bin/activate
           mv tests/integration/config/settings-${{ inputs.content_retrieval_handler }}-${{ inputs.llm_handler}}.yml tests/integration/config/settings.yml
-          entrofeed load-settings
-          entrofeed load-feeds
-          entrofeed check-feeds
+          .venv/bin/entrofeed load-settings
+          .venv/bin/entrofeed load-feeds
+          .venv/bin/entrofeed check-feeds
           make run-ci
           make integration-test

@@ -60,4 +60,4 @@ clean:
 
 .PHONY: unit-test
 unit-test:
-	pytest -vvv -cov
+	pytest -vvv
