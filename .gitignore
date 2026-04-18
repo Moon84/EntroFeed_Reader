@@ -51,6 +51,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+scripts/
 
 # Translations
 *.mo
@@ -181,3 +182,24 @@ app/static/output.css
 
 # Dev Data
 data/
+
+# Documentation
+docs/
+
+# Claude Code (local settings)
+.claude/
+
+# Debug files
+cdp_debug.py
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+
+# Package locks (use uv.lock for Python)
+package-lock.json
+uv.lock
+.DS_Store
+src/.DS_Store
+**/.DS_Store
