@@ -13,6 +13,7 @@ import re
 from typing import Dict, List, Any, Callable
 
 from .types import (
+    InterestTag,
     UnifiedNode,
     InterestCategory,
     TagSource,
