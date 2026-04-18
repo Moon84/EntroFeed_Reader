@@ -225,7 +225,6 @@ class InterestBasedRecommender:
                 for pt in profile.tags:
                     if tag_name.lower() in pt.name.lower() or pt.name.lower() in tag_name.lower():
                         tag_score = 0.3
-                        match_type = "fuzzy"
                         break
 
             if tag_score > 0:

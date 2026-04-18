@@ -66,7 +66,6 @@ class SimilarRecommender:
                 from src.backend import EntroFeedBackend
                 from src.storage.singleton import get_storage
                 storage = get_storage()
-                backend = EntroFeedBackend(db=storage)
                 entry = storage.get_feed_entry(entry_id)
                 query_text = f"{entry.title} {entry.preview or ''}"
             except Exception:

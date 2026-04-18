@@ -74,9 +74,6 @@ class TrendingRecommender:
         except Exception:
             return []
 
-        # Build a map of entry_id -> profile and collect all profiles for overlap calculation
-        entry_profiles: Dict[str, ContentProfile] = {p.entry_id: p for p in profiles}
-
         # Score each profile
         scored: List[tuple] = []
         for profile in profiles:
