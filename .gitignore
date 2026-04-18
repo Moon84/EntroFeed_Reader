@@ -166,12 +166,12 @@ cython_debug/
 *.json
 session.txt
 .envrc
-configs/handlers.yml.example
-configs/handlers.yml
-configs/settings.yml
+configs/*
+!configs/*.example
+!configs/digital_medical_feeds.opml
+!configs/.gitkeep
 configs/db/
 *.mdb
-*.opml
 
 node_modules
 app/static/output.css
